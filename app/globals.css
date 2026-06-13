@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fafaf8;
+  --foreground: #1a1a1a;
+  --gold: #b8956a;
+  --gold-light: #d4b896;
+  --sage: #7a9e8e;
+  --sage-light: #a8c4b8;
+  --cream: #f5f0e8;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-gold: var(--gold);
+  --color-gold-light: var(--gold-light);
+  --color-sage: var(--sage);
+  --color-sage-light: var(--sage-light);
+  --color-cream: var(--cream);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Noto Serif TC", "PingFang TC", "Hiragino Sans GB", serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.rdp {
+  --rdp-cell-size: 40px;
+  margin: 0;
+}
+
+.rdp-day_selected {
+  background-color: var(--gold) !important;
+}
+
+.rdp-day_today {
+  font-weight: bold;
+  color: var(--sage);
+}
+
+/* Smooth transitions */
+* {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--gold-light);
+  border-radius: 2px;
+}
