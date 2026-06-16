@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAdmin } from "@/lib/adminContext";
-import { ADMIN_STAFF, ADMIN_STORES, AdminStaff, InternalLevel, DisplayLevel } from "@/lib/adminMockData";
+import { ADMIN_STAFF, ADMIN_STORES, AdminStaff, InternalLevel, DisplayLevel, EmploymentType } from "@/lib/adminMockData";
 import { useRouter } from "next/navigation";
 
 const INTERNAL_LEVELS: InternalLevel[] = ["實習技師", "準技師", "初階老師", "進階老師", "資深老師", "技術長"];
@@ -18,6 +18,8 @@ export default function StaffPage() {
     internalLevel: "初階老師",
     displayLevel: "技師職人",
     storeId: "ST01",
+    employmentType: "承攬制",
+    baseSalary: 0,
     commissionPerSession: 500,
     positionAllowance: 0,
   });
@@ -42,7 +44,7 @@ export default function StaffPage() {
     const id = `S${String(staff.length + 1).padStart(3, "0")}`;
     setStaff(prev => [...prev, { ...newStaff, id, username: `staff${staff.length + 1}` } as AdminStaff]);
     setShowAddModal(false);
-    setNewStaff({ internalLevel: "初階老師", displayLevel: "技師職人", storeId: "ST01", commissionPerSession: 500, positionAllowance: 0 });
+    setNewStaff({ internalLevel: "初階老師", displayLevel: "技師職人", storeId: "ST01", employmentType: "承攬制", baseSalary: 0, commissionPerSession: 500, positionAllowance: 0 });
   };
 
   return (
@@ -76,6 +78,12 @@ export default function StaffPage() {
                   <div className="text-xs text-[#8a7a6e] space-y-0.5">
                     <div>內部職級：{s.internalLevel}</div>
                     <div>所屬門市：{store?.name}</div>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${s.employmentType === "僱傭制" ? "bg-orange-50 text-orange-700" : "bg-blue-50 text-blue-700"}`}>{s.employmentType}</span>
+                      {s.employmentType === "僱傭制" && <span>底薪 ${s.baseSalary.toLocaleString()}</span>}
+                      <span>抽成 ${s.commissionPerSession.toLocaleString()}／筆</span>
+                      {s.positionAllowance > 0 && <span>加給 ${s.positionAllowance.toLocaleString()}</span>}
+                    </div>
                     <div>帳號：{s.username}</div>
                   </div>
                 </div>
@@ -136,6 +144,29 @@ export default function StaffPage() {
                 </select>
               </div>
               <div>
+                <label className="text-xs text-[#8a7a6e] mb-1 block">聘用制度</label>
+                <select
+                  value={editStaff.employmentType}
+                  onChange={e => setEditStaff(prev => prev ? { ...prev, employmentType: e.target.value as EmploymentType, baseSalary: e.target.value === "承攬制" ? 0 : prev.baseSalary } : null)}
+                  className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
+                >
+                  <option value="承攬制">承攬制（無底薪，純抽成）</option>
+                  <option value="僱傭制">僱傭制（底薪 + 抽成）</option>
+                </select>
+              </div>
+              {editStaff.employmentType === "僱傭制" && (
+                <div>
+                  <label className="text-xs text-[#8a7a6e] mb-1 block">底薪（元／月）</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editStaff.baseSalary}
+                    onChange={e => setEditStaff(prev => prev ? { ...prev, baseSalary: Number(e.target.value) } : null)}
+                    className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
+                  />
+                </div>
+              )}
+              <div>
                 <label className="text-xs text-[#8a7a6e] mb-1 block">每筆固定抽成（元）</label>
                 <input
                   type="number"
@@ -145,16 +176,18 @@ export default function StaffPage() {
                   className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
                 />
               </div>
-              <div>
-                <label className="text-xs text-[#8a7a6e] mb-1 block">職位加給（元／月）</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={editStaff.positionAllowance}
-                  onChange={e => setEditStaff(prev => prev ? { ...prev, positionAllowance: Number(e.target.value) } : null)}
-                  className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
-                />
-              </div>
+              {editStaff.employmentType === "僱傭制" && (
+                <div>
+                  <label className="text-xs text-[#8a7a6e] mb-1 block">職位加給（元／月）</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editStaff.positionAllowance}
+                    onChange={e => setEditStaff(prev => prev ? { ...prev, positionAllowance: Number(e.target.value) } : null)}
+                    className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
+                  />
+                </div>
+              )}
             </div>
             <div className="flex gap-3 mt-4">
               <button onClick={() => setEditStaff(null)} className="flex-1 py-2.5 border border-[#e8ddd2] rounded-xl text-sm text-[#8a7a6e]">取消</button>
@@ -197,6 +230,23 @@ export default function StaffPage() {
               >
                 {ADMIN_STORES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
+              <select
+                value={newStaff.employmentType}
+                onChange={e => setNewStaff(p => ({ ...p, employmentType: e.target.value as EmploymentType, baseSalary: e.target.value === "承攬制" ? 0 : p.baseSalary }))}
+                className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
+              >
+                <option value="承攬制">承攬制（無底薪，純抽成）</option>
+                <option value="僱傭制">僱傭制（底薪 + 抽成）</option>
+              </select>
+              {newStaff.employmentType === "僱傭制" && (
+                <input
+                  type="number"
+                  placeholder="底薪（元／月）"
+                  value={newStaff.baseSalary || ""}
+                  onChange={e => setNewStaff(p => ({ ...p, baseSalary: Number(e.target.value) }))}
+                  className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
+                />
+              )}
               <input
                 type="number"
                 placeholder="每筆固定抽成（元）"
@@ -204,13 +254,15 @@ export default function StaffPage() {
                 onChange={e => setNewStaff(p => ({ ...p, commissionPerSession: Number(e.target.value) }))}
                 className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
               />
-              <input
-                type="number"
-                placeholder="職位加給（元／月），無則填 0"
-                value={newStaff.positionAllowance ?? ""}
-                onChange={e => setNewStaff(p => ({ ...p, positionAllowance: Number(e.target.value) }))}
-                className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
-              />
+              {newStaff.employmentType === "僱傭制" && (
+                <input
+                  type="number"
+                  placeholder="職位加給（元／月），無則填 0"
+                  value={newStaff.positionAllowance ?? ""}
+                  onChange={e => setNewStaff(p => ({ ...p, positionAllowance: Number(e.target.value) }))}
+                  className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
+                />
+              )}
             </div>
             <div className="flex gap-3 mt-4">
               <button onClick={() => setShowAddModal(false)} className="flex-1 py-2.5 border border-[#e8ddd2] rounded-xl text-sm text-[#8a7a6e]">取消</button>

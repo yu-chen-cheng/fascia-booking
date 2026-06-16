@@ -1,5 +1,6 @@
 export type BookingStatus = "待確認" | "已確認" | "已完成" | "已取消";
-export type ExpenseCategory = "房租" | "水電" | "心水費" | "薪資" | "耗材" | "其他";
+export type ExpenseCategory = "房租" | "水電" | "薪水費" | "耗材" | "其他";
+export type EmploymentType = "承攬制" | "僱傭制";
 
 export interface FixedExpenseTemplate {
   id: string;
@@ -36,8 +37,10 @@ export interface AdminStaff {
   internalLevel: InternalLevel;
   displayLevel: DisplayLevel;
   storeId: string;
+  employmentType: EmploymentType;
+  baseSalary: number;          // 僱傭制底薪（承攬制填 0）
   commissionPerSession: number; // 每筆固定抽成金額
-  positionAllowance: number;   // 每月職位加給
+  positionAllowance: number;   // 每月職位加給（僱傭制才有）
   username: string;
 }
 
@@ -90,28 +93,25 @@ export interface AdminBooking {
   paymentMethod: PaymentMethod;
 }
 
-// 固定費用範本（每月自動帶入）
+// 固定費用範本（每月自動帶入，不含薪水 — 薪水由員工資料自動計算）
 export const FIXED_EXPENSE_TEMPLATES: FixedExpenseTemplate[] = [
   { id: "FT01", storeId: "ST01", category: "房租", name: "小巨蛋店 房租", amount: 80000 },
   { id: "FT02", storeId: "ST02", category: "房租", name: "大安店 房租", amount: 65000 },
   { id: "FT03", storeId: "ST01", category: "水電", name: "小巨蛋店 水電費", amount: 8000 },
   { id: "FT04", storeId: "ST02", category: "水電", name: "大安店 水電費", amount: 6500 },
-  { id: "FT05", storeId: "all", category: "心水費", name: "總部 心水費", amount: 3000 },
 ];
 
-// 本月費用記錄（含固定 + 臨時）
+// 本月費用記錄（含固定 + 臨時，薪水費另計）
 export const MONTHLY_EXPENSES: MonthlyExpense[] = [
   { id: "ME01", month: "2026-06", storeId: "ST01", category: "房租", name: "小巨蛋店 房租", amount: 80000, confirmed: false, isFixed: true },
   { id: "ME02", month: "2026-06", storeId: "ST02", category: "房租", name: "大安店 房租", amount: 65000, confirmed: false, isFixed: true },
   { id: "ME03", month: "2026-06", storeId: "ST01", category: "水電", name: "小巨蛋店 水電費", amount: 8000, confirmed: false, isFixed: true },
   { id: "ME04", month: "2026-06", storeId: "ST02", category: "水電", name: "大安店 水電費", amount: 6500, confirmed: false, isFixed: true },
-  { id: "ME05", month: "2026-06", storeId: "all", category: "心水費", name: "總部 心水費", amount: 3000, confirmed: false, isFixed: true },
-  { id: "ME06", month: "2026-05", storeId: "ST01", category: "房租", name: "小巨蛋店 房租", amount: 80000, confirmed: true, isFixed: true },
-  { id: "ME07", month: "2026-05", storeId: "ST02", category: "房租", name: "大安店 房租", amount: 65000, confirmed: true, isFixed: true },
-  { id: "ME08", month: "2026-05", storeId: "ST01", category: "水電", name: "小巨蛋店 水電費", amount: 7800, confirmed: true, isFixed: true },
-  { id: "ME09", month: "2026-05", storeId: "ST02", category: "水電", name: "大安店 水電費", amount: 6200, confirmed: true, isFixed: true },
-  { id: "ME10", month: "2026-05", storeId: "all", category: "心水費", name: "總部 心水費", amount: 3000, confirmed: true, isFixed: true },
-  { id: "ME11", month: "2026-05", storeId: "ST01", category: "耗材", name: "精油補貨", amount: 4500, confirmed: true, isFixed: false },
+  { id: "ME05", month: "2026-05", storeId: "ST01", category: "房租", name: "小巨蛋店 房租", amount: 80000, confirmed: true, isFixed: true },
+  { id: "ME06", month: "2026-05", storeId: "ST02", category: "房租", name: "大安店 房租", amount: 65000, confirmed: true, isFixed: true },
+  { id: "ME07", month: "2026-05", storeId: "ST01", category: "水電", name: "小巨蛋店 水電費", amount: 7800, confirmed: true, isFixed: true },
+  { id: "ME08", month: "2026-05", storeId: "ST02", category: "水電", name: "大安店 水電費", amount: 6200, confirmed: true, isFixed: true },
+  { id: "ME09", month: "2026-05", storeId: "ST01", category: "耗材", name: "精油補貨", amount: 4500, confirmed: true, isFixed: false },
 ];
 
 export const ADMIN_STORES: AdminStore[] = [
@@ -120,11 +120,11 @@ export const ADMIN_STORES: AdminStore[] = [
 ];
 
 export const ADMIN_STAFF: AdminStaff[] = [
-  { id: "S001", name: "王小明", internalLevel: "技術長", displayLevel: "技術長", storeId: "ST01", commissionPerSession: 1200, positionAllowance: 5000, username: "manager" },
-  { id: "S002", name: "陳美玲", internalLevel: "資深老師", displayLevel: "技師職人", storeId: "ST01", commissionPerSession: 900, positionAllowance: 3000, username: "staff1" },
-  { id: "S003", name: "林志偉", internalLevel: "進階老師", displayLevel: "技師職人", storeId: "ST02", commissionPerSession: 800, positionAllowance: 2000, username: "staff2" },
-  { id: "S004", name: "黃雅琪", internalLevel: "初階老師", displayLevel: "技師職人", storeId: "ST02", commissionPerSession: 700, positionAllowance: 0, username: "staff3" },
-  { id: "S005", name: "張建宏", internalLevel: "準技師", displayLevel: "技師職人", storeId: "ST01", commissionPerSession: 500, positionAllowance: 0, username: "staff4" },
+  { id: "S001", name: "王小明", internalLevel: "技術長", displayLevel: "技術長", storeId: "ST01", employmentType: "僱傭制", baseSalary: 45000, commissionPerSession: 1200, positionAllowance: 5000, username: "manager" },
+  { id: "S002", name: "陳美玲", internalLevel: "資深老師", displayLevel: "技師職人", storeId: "ST01", employmentType: "僱傭制", baseSalary: 35000, commissionPerSession: 900, positionAllowance: 3000, username: "staff1" },
+  { id: "S003", name: "林志偉", internalLevel: "進階老師", displayLevel: "技師職人", storeId: "ST02", employmentType: "承攬制", baseSalary: 0, commissionPerSession: 800, positionAllowance: 0, username: "staff2" },
+  { id: "S004", name: "黃雅琪", internalLevel: "初階老師", displayLevel: "技師職人", storeId: "ST02", employmentType: "承攬制", baseSalary: 0, commissionPerSession: 700, positionAllowance: 0, username: "staff3" },
+  { id: "S005", name: "張建宏", internalLevel: "準技師", displayLevel: "技師職人", storeId: "ST01", employmentType: "承攬制", baseSalary: 0, commissionPerSession: 500, positionAllowance: 0, username: "staff4" },
 ];
 
 export const ADMIN_SERVICES: AdminService[] = [

@@ -2,16 +2,15 @@
 
 import { useState } from "react";
 import { useAdmin } from "@/lib/adminContext";
-import { MONTHLY_EXPENSES, FIXED_EXPENSE_TEMPLATES, ADMIN_STORES, MonthlyExpense, ExpenseCategory } from "@/lib/adminMockData";
+import { MONTHLY_EXPENSES, FIXED_EXPENSE_TEMPLATES, ADMIN_STORES, ADMIN_STAFF, ADMIN_BOOKINGS, MonthlyExpense, ExpenseCategory } from "@/lib/adminMockData";
 import { useRouter } from "next/navigation";
 
-const CATEGORIES: ExpenseCategory[] = ["房租", "水電", "心水費", "薪資", "耗材", "其他"];
+const CATEGORIES: ExpenseCategory[] = ["房租", "水電", "薪水費", "耗材", "其他"];
 
 const CATEGORY_COLORS: Record<ExpenseCategory, string> = {
   "房租": "bg-red-50 text-red-700",
   "水電": "bg-blue-50 text-blue-700",
-  "心水費": "bg-purple-50 text-purple-700",
-  "薪資": "bg-orange-50 text-orange-700",
+  "薪水費": "bg-orange-50 text-orange-700",
   "耗材": "bg-green-50 text-green-700",
   "其他": "bg-gray-100 text-gray-600",
 };
@@ -38,7 +37,28 @@ export default function ExpensesPage() {
 
   const monthExpenses = expenses.filter(e => e.month === month);
   const unconfirmed = monthExpenses.filter(e => !e.confirmed);
-  const totalExpense = monthExpenses.reduce((s, e) => s + e.amount, 0);
+
+  // Calculate salary for each staff based on completed bookings this month
+  const staffSalaries = ADMIN_STAFF.map(s => {
+    const completedThisMonth = ADMIN_BOOKINGS.filter(
+      b => b.staffId === s.id && b.status === "已完成" && b.date.startsWith(month)
+    );
+    const sessionCount = completedThisMonth.length;
+    const commissionTotal = sessionCount * s.commissionPerSession;
+    const storeName = ADMIN_STORES.find(st => st.id === s.storeId)?.name || "";
+
+    if (s.employmentType === "僱傭制") {
+      // 底薪 + 抽成 + 職位加給
+      const total = s.baseSalary + commissionTotal + s.positionAllowance;
+      return { ...s, sessionCount, commissionTotal, totalSalary: total, storeName };
+    } else {
+      // 承攬制：只有抽成，無底薪
+      return { ...s, sessionCount, commissionTotal, totalSalary: commissionTotal, storeName };
+    }
+  });
+  const totalSalaryExpense = staffSalaries.reduce((s, st) => s + st.totalSalary, 0);
+
+  const totalExpense = monthExpenses.reduce((s, e) => s + e.amount, 0) + totalSalaryExpense;
   const confirmedTotal = monthExpenses.filter(e => e.confirmed).reduce((s, e) => s + e.amount, 0);
 
   const confirmAll = () => {
@@ -126,17 +146,17 @@ export default function ExpensesPage() {
       {/* Summary */}
       <div className="grid grid-cols-2 gap-3 mb-5">
         <div className="bg-white rounded-2xl border border-[#e8ddd2] p-4">
-          <div className="text-xs text-[#8a7a6e] mb-1">本月總支出</div>
+          <div className="text-xs text-[#8a7a6e] mb-1">本月總支出（含薪水）</div>
           <div className="text-2xl font-semibold text-red-600">${totalExpense.toLocaleString()}</div>
-          <div className="text-xs text-[#8a7a6e] mt-1">{monthExpenses.length} 筆</div>
+          <div className="text-xs text-[#8a7a6e] mt-1">薪水費 ${totalSalaryExpense.toLocaleString()} + 其他 ${monthExpenses.reduce((s,e)=>s+e.amount,0).toLocaleString()}</div>
         </div>
         <div className="bg-white rounded-2xl border border-[#e8ddd2] p-4">
-          <div className="text-xs text-[#8a7a6e] mb-1">已確認</div>
+          <div className="text-xs text-[#8a7a6e] mb-1">固定費用確認狀況</div>
           <div className="text-2xl font-semibold text-[#1c1c1c]">${confirmedTotal.toLocaleString()}</div>
           <div className="text-xs text-[#8a7a6e] mt-1">
             {unconfirmed.length > 0
-              ? <span className="text-amber-600">待確認 ${(totalExpense - confirmedTotal).toLocaleString()}</span>
-              : "全部確認"
+              ? <span className="text-amber-600">待確認 {unconfirmed.length} 筆</span>
+              : <span className="text-green-600">全部確認 ✓</span>
             }
           </div>
         </div>
@@ -176,6 +196,50 @@ export default function ExpensesPage() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Staff salary section */}
+      <div className="bg-white rounded-2xl border border-[#e8ddd2] p-4 mb-4">
+        <h2 className="text-sm font-medium text-[#1c1c1c] mb-1">薪水費明細</h2>
+        <p className="text-xs text-[#8a7a6e] mb-4">依本月已完成預約自動計算</p>
+        <div className="space-y-3">
+          {staffSalaries.map(s => (
+            <div key={s.id} className="py-2.5 border-b border-[#e8ddd2] last:border-0">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
+                    s.employmentType === "僱傭制"
+                      ? "bg-orange-50 text-orange-700 border-orange-200"
+                      : "bg-blue-50 text-blue-700 border-blue-200"
+                  }`}>{s.employmentType}</span>
+                  <span className="text-sm font-medium text-[#1c1c1c]">{s.name}</span>
+                  <span className="text-xs text-[#8a7a6e]">{s.storeName}</span>
+                </div>
+                <span className="text-sm font-medium text-[#1c1c1c]">${s.totalSalary.toLocaleString()}</span>
+              </div>
+              <div className="text-xs text-[#8a7a6e] ml-0 space-y-0.5">
+                {s.employmentType === "僱傭制" && (
+                  <div className="flex justify-between">
+                    <span>底薪</span><span>${s.baseSalary.toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span>抽成（{s.sessionCount} 筆 × ${s.commissionPerSession.toLocaleString()}）</span>
+                  <span>${s.commissionTotal.toLocaleString()}</span>
+                </div>
+                {s.positionAllowance > 0 && (
+                  <div className="flex justify-between">
+                    <span>職位加給</span><span>${s.positionAllowance.toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 pt-3 border-t border-[#e8ddd2] flex justify-between text-sm font-medium">
+          <span className="text-[#1c1c1c]">薪水費合計</span>
+          <span className="text-orange-700">${totalSalaryExpense.toLocaleString()}</span>
+        </div>
       </div>
 
       {/* Variable expenses */}
