@@ -48,11 +48,11 @@ export default function ServicesPage() {
     } else if (addStep === "duration") {
       setAddStep("price");
     } else if (addStep === "price") {
-      if (!newService.price || !newService.memberPrice) return;
+      if (!newService.priceRegular || !newService.priceMember) return;
       setPriceConfirm("");
       setAddStep("confirm_price");
     } else if (addStep === "confirm_price") {
-      if (String(priceConfirm) !== String(newService.price)) {
+      if (String(priceConfirm) !== String(newService.priceRegular)) {
         setPriceError(true);
         return;
       }
@@ -118,9 +118,13 @@ export default function ServicesPage() {
                 {s.enabled ? "停用" : "啟用"}
               </button>
             </div>
-            <div className="flex gap-4 text-xs text-[#8a7a6e]">
-              <div>一般價：<span className="text-[#1c1c1c] font-medium">${s.price.toLocaleString()}</span></div>
-              <div>會員價：<span className="text-[#8b6748] font-medium">${s.memberPrice.toLocaleString()}</span></div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-[#8a7a6e] mt-2">
+              <div>技師職人 一般：<span className="text-[#1c1c1c] font-medium">${s.priceRegular.toLocaleString()}</span></div>
+              <div>技師職人 會員：<span className="text-[#8b6748] font-medium">${s.priceMember.toLocaleString()}</span></div>
+              <div>技術長 一般：<span className="text-[#1c1c1c] font-medium">${s.priceSeniorRegular.toLocaleString()}</span></div>
+              <div>技術長 會員：<span className="text-[#8b6748] font-medium">${s.priceSeniorMember.toLocaleString()}</span></div>
+              <div>特約廠商：<span className="text-purple-600 font-medium">${s.priceVendor.toLocaleString()}</span></div>
+              <div>親友價：<span className="text-blue-600 font-medium">${s.priceFriend.toLocaleString()}</span></div>
             </div>
           </div>
         ))}
@@ -173,35 +177,34 @@ export default function ServicesPage() {
             )}
 
             {addStep === "price" && (
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-[#1c1c1c] block">設定價格</label>
-                <div>
-                  <label className="text-xs text-[#8a7a6e] mb-1 block">一般定價</label>
-                  <input
-                    type="number"
-                    value={newService.price || ""}
-                    onChange={e => setNewService(p => ({ ...p, price: Number(e.target.value) }))}
-                    placeholder="例：3000"
-                    className="w-full px-3 py-3 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-[#8a7a6e] mb-1 block">會員價</label>
-                  <input
-                    type="number"
-                    value={newService.memberPrice || ""}
-                    onChange={e => setNewService(p => ({ ...p, memberPrice: Number(e.target.value) }))}
-                    placeholder="例：2500"
-                    className="w-full px-3 py-3 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
-                  />
-                </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-[#1c1c1c] block">設定各級定價</label>
+                {[
+                  { label: "技師職人 一般價", field: "priceRegular" },
+                  { label: "技師職人 會員價", field: "priceMember" },
+                  { label: "技術長 一般價", field: "priceSeniorRegular" },
+                  { label: "技術長 會員價", field: "priceSeniorMember" },
+                  { label: "特約廠商價", field: "priceVendor" },
+                  { label: "親友價", field: "priceFriend" },
+                ].map(({ label, field }) => (
+                  <div key={field}>
+                    <label className="text-xs text-[#8a7a6e] mb-1 block">{label}</label>
+                    <input
+                      type="number"
+                      value={(newService as Record<string, unknown>)[field] as number || ""}
+                      onChange={e => setNewService(p => ({ ...p, [field]: Number(e.target.value) }))}
+                      placeholder="輸入金額"
+                      className="w-full px-3 py-2 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
+                    />
+                  </div>
+                ))}
               </div>
             )}
 
             {addStep === "confirm_price" && (
               <div>
                 <label className="text-sm font-medium text-[#1c1c1c] mb-1 block">再次輸入一般定價確認</label>
-                <p className="text-xs text-[#8a7a6e] mb-3">請再次輸入 ${newService.price?.toLocaleString()} 以確認</p>
+                <p className="text-xs text-[#8a7a6e] mb-3">請再次輸入技師職人一般價 ${newService.priceRegular?.toLocaleString()} 以確認</p>
                 <input
                   autoFocus
                   type="number"
@@ -229,12 +232,28 @@ export default function ServicesPage() {
                     <span className="text-[#1c1c1c]">{newService.duration} 分鐘</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#8a7a6e]">一般定價</span>
-                    <span className="text-[#1c1c1c]">${newService.price?.toLocaleString()}</span>
+                    <span className="text-[#8a7a6e]">技師職人 一般</span>
+                    <span className="text-[#1c1c1c]">${newService.priceRegular?.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#8a7a6e]">會員價</span>
-                    <span className="text-[#8b6748]">${newService.memberPrice?.toLocaleString()}</span>
+                    <span className="text-[#8a7a6e]">技師職人 會員</span>
+                    <span className="text-[#8b6748]">${newService.priceMember?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#8a7a6e]">技術長 一般</span>
+                    <span className="text-[#1c1c1c]">${newService.priceSeniorRegular?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#8a7a6e]">技術長 會員</span>
+                    <span className="text-[#8b6748]">${newService.priceSeniorMember?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#8a7a6e]">特約廠商</span>
+                    <span className="text-purple-600">${newService.priceVendor?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#8a7a6e]">親友價</span>
+                    <span className="text-blue-600">${newService.priceFriend?.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[#8a7a6e]">狀態</span>

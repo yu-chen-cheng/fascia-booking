@@ -34,8 +34,8 @@ export default function DashboardPage() {
 
         <div className="grid grid-cols-2 gap-3 mb-6">
           <StatCard label="今日預約數" value={String(todayBookings.length)} sub="全館" color="text-[#8b6748]" />
+          <StatCard label="本日營收" value={`$${ADMIN_BOOKINGS.filter(b => b.date === today && b.status === "已完成").reduce((s, b) => s + b.price, 0).toLocaleString()}`} sub="已完成訂單" color="text-[#8b6748]" />
           <StatCard label="本月營收" value={`$${monthRevenue.toLocaleString()}`} sub="已完成訂單" color="text-[#8b6748]" />
-          <StatCard label="會員數" value={String(ADMIN_CUSTOMERS.length)} sub="含一般/黃金/白金" />
           <StatCard label="待處理事項" value={String(pendingCount)} sub="待確認預約" color={pendingCount > 0 ? "text-amber-600" : "text-[#1c1c1c]"} />
         </div>
 

@@ -18,7 +18,8 @@ export default function StaffPage() {
     internalLevel: "初階老師",
     displayLevel: "技師職人",
     storeId: "ST01",
-    commissionRate: 25,
+    commissionPerSession: 500,
+    positionAllowance: 0,
   });
 
   if (!user) return null;
@@ -41,7 +42,7 @@ export default function StaffPage() {
     const id = `S${String(staff.length + 1).padStart(3, "0")}`;
     setStaff(prev => [...prev, { ...newStaff, id, username: `staff${staff.length + 1}` } as AdminStaff]);
     setShowAddModal(false);
-    setNewStaff({ internalLevel: "初階老師", displayLevel: "技師職人", storeId: "ST01", commissionRate: 25 });
+    setNewStaff({ internalLevel: "初階老師", displayLevel: "技師職人", storeId: "ST01", commissionPerSession: 500, positionAllowance: 0 });
   };
 
   return (
@@ -135,13 +136,22 @@ export default function StaffPage() {
                 </select>
               </div>
               <div>
-                <label className="text-xs text-[#8a7a6e] mb-1 block">抽成比例 (%)</label>
+                <label className="text-xs text-[#8a7a6e] mb-1 block">每筆固定抽成（元）</label>
                 <input
                   type="number"
                   min={0}
-                  max={100}
-                  value={editStaff.commissionRate}
-                  onChange={e => setEditStaff(prev => prev ? { ...prev, commissionRate: Number(e.target.value) } : null)}
+                  value={editStaff.commissionPerSession}
+                  onChange={e => setEditStaff(prev => prev ? { ...prev, commissionPerSession: Number(e.target.value) } : null)}
+                  className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-[#8a7a6e] mb-1 block">職位加給（元／月）</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={editStaff.positionAllowance}
+                  onChange={e => setEditStaff(prev => prev ? { ...prev, positionAllowance: Number(e.target.value) } : null)}
                   className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
                 />
               </div>
@@ -189,9 +199,16 @@ export default function StaffPage() {
               </select>
               <input
                 type="number"
-                placeholder="抽成比例 (%)"
-                value={newStaff.commissionRate || ""}
-                onChange={e => setNewStaff(p => ({ ...p, commissionRate: Number(e.target.value) }))}
+                placeholder="每筆固定抽成（元）"
+                value={newStaff.commissionPerSession || ""}
+                onChange={e => setNewStaff(p => ({ ...p, commissionPerSession: Number(e.target.value) }))}
+                className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
+              />
+              <input
+                type="number"
+                placeholder="職位加給（元／月），無則填 0"
+                value={newStaff.positionAllowance ?? ""}
+                onChange={e => setNewStaff(p => ({ ...p, positionAllowance: Number(e.target.value) }))}
                 className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
               />
             </div>
