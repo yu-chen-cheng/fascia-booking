@@ -1,4 +1,25 @@
 export type BookingStatus = "待確認" | "已確認" | "已完成" | "已取消";
+export type ExpenseCategory = "房租" | "水電" | "心水費" | "薪資" | "耗材" | "其他";
+
+export interface FixedExpenseTemplate {
+  id: string;
+  storeId: string; // "all" = 全館
+  category: ExpenseCategory;
+  name: string;
+  amount: number;
+}
+
+export interface MonthlyExpense {
+  id: string;
+  month: string; // "2026-06"
+  storeId: string;
+  category: ExpenseCategory;
+  name: string;
+  amount: number;
+  confirmed: boolean;
+  isFixed: boolean; // 是否為固定費用自動帶入
+  note?: string;
+}
 export type InternalLevel = "實習技師" | "準技師" | "初階老師" | "進階老師" | "資深老師" | "技術長";
 export type DisplayLevel = "技師職人" | "技術長";
 export type MemberTier = "一般會員" | "黃金會員" | "白金會員";
@@ -68,6 +89,30 @@ export interface AdminBooking {
   notes: string;
   paymentMethod: PaymentMethod;
 }
+
+// 固定費用範本（每月自動帶入）
+export const FIXED_EXPENSE_TEMPLATES: FixedExpenseTemplate[] = [
+  { id: "FT01", storeId: "ST01", category: "房租", name: "小巨蛋店 房租", amount: 80000 },
+  { id: "FT02", storeId: "ST02", category: "房租", name: "大安店 房租", amount: 65000 },
+  { id: "FT03", storeId: "ST01", category: "水電", name: "小巨蛋店 水電費", amount: 8000 },
+  { id: "FT04", storeId: "ST02", category: "水電", name: "大安店 水電費", amount: 6500 },
+  { id: "FT05", storeId: "all", category: "心水費", name: "總部 心水費", amount: 3000 },
+];
+
+// 本月費用記錄（含固定 + 臨時）
+export const MONTHLY_EXPENSES: MonthlyExpense[] = [
+  { id: "ME01", month: "2026-06", storeId: "ST01", category: "房租", name: "小巨蛋店 房租", amount: 80000, confirmed: false, isFixed: true },
+  { id: "ME02", month: "2026-06", storeId: "ST02", category: "房租", name: "大安店 房租", amount: 65000, confirmed: false, isFixed: true },
+  { id: "ME03", month: "2026-06", storeId: "ST01", category: "水電", name: "小巨蛋店 水電費", amount: 8000, confirmed: false, isFixed: true },
+  { id: "ME04", month: "2026-06", storeId: "ST02", category: "水電", name: "大安店 水電費", amount: 6500, confirmed: false, isFixed: true },
+  { id: "ME05", month: "2026-06", storeId: "all", category: "心水費", name: "總部 心水費", amount: 3000, confirmed: false, isFixed: true },
+  { id: "ME06", month: "2026-05", storeId: "ST01", category: "房租", name: "小巨蛋店 房租", amount: 80000, confirmed: true, isFixed: true },
+  { id: "ME07", month: "2026-05", storeId: "ST02", category: "房租", name: "大安店 房租", amount: 65000, confirmed: true, isFixed: true },
+  { id: "ME08", month: "2026-05", storeId: "ST01", category: "水電", name: "小巨蛋店 水電費", amount: 7800, confirmed: true, isFixed: true },
+  { id: "ME09", month: "2026-05", storeId: "ST02", category: "水電", name: "大安店 水電費", amount: 6200, confirmed: true, isFixed: true },
+  { id: "ME10", month: "2026-05", storeId: "all", category: "心水費", name: "總部 心水費", amount: 3000, confirmed: true, isFixed: true },
+  { id: "ME11", month: "2026-05", storeId: "ST01", category: "耗材", name: "精油補貨", amount: 4500, confirmed: true, isFixed: false },
+];
 
 export const ADMIN_STORES: AdminStore[] = [
   { id: "ST01", name: "小巨蛋店" },

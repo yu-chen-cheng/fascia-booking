@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useAdmin } from "@/lib/adminContext";
-import { ADMIN_BOOKINGS, ADMIN_STAFF, ADMIN_STORES, ADMIN_CUSTOMERS, PaymentMethod } from "@/lib/adminMockData";
+import { ADMIN_BOOKINGS, ADMIN_STAFF, ADMIN_STORES, ADMIN_CUSTOMERS, MONTHLY_EXPENSES, PaymentMethod } from "@/lib/adminMockData";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 const PAYMENT_METHODS: PaymentMethod[] = ["現金", "電子支付", "轉帳", "信用卡", "儲值金"];
 
@@ -44,6 +45,13 @@ export default function ReportsPage() {
   const totalRevenue = completed.reduce((s, b) => s + b.price, 0);
   const completionRate = filtered.length > 0 ? Math.round((completed.length / filtered.length) * 100) : 0;
   const newCustomers = ADMIN_CUSTOMERS.filter(c => c.joinDate >= dateFrom && c.joinDate <= dateTo).length;
+
+  // Expenses for the selected month range
+  const reportMonth = dateFrom.slice(0, 7); // "2026-06"
+  const monthExpenses = MONTHLY_EXPENSES.filter(e => e.month === reportMonth);
+  const totalExpense = monthExpenses.reduce((s, e) => s + e.amount, 0);
+  const unconfirmedExpenses = monthExpenses.filter(e => !e.confirmed);
+  const netProfit = totalRevenue - totalExpense;
 
   // Today revenue
   const todayCompleted = ADMIN_BOOKINGS.filter(b =>
@@ -155,6 +163,45 @@ export default function ReportsPage() {
           <div className="text-2xl font-semibold text-[#1c1c1c]">{newCustomers}</div>
         </div>
       </div>
+
+      {/* Expense warning */}
+      {unconfirmedExpenses.length > 0 && (
+        <Link href="/admin/expenses" className="block bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium text-amber-800">⚠ 有 {unconfirmedExpenses.length} 筆費用尚未確認</div>
+              <div className="text-xs text-amber-700 mt-0.5">利潤計算可能不準確，點此前往確認費用</div>
+            </div>
+            <span className="text-amber-600 text-sm">→</span>
+          </div>
+        </Link>
+      )}
+
+      {/* Revenue vs Expense */}
+      {monthExpenses.length > 0 && (
+        <div className="bg-white rounded-2xl border border-[#e8ddd2] p-4 mb-4">
+          <h2 className="text-sm font-medium text-[#1c1c1c] mb-4">收支概覽（{reportMonth}）</h2>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-[#8a7a6e]">期間總營收</span>
+              <span className="text-sm font-medium text-[#8b6748]">+${totalRevenue.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-[#8a7a6e]">總支出</span>
+              <span className="text-sm font-medium text-red-600">−${totalExpense.toLocaleString()}</span>
+            </div>
+            <div className="border-t border-[#e8ddd2] pt-3 flex justify-between items-center">
+              <span className="text-sm font-semibold text-[#1c1c1c]">淨利潤</span>
+              <span className={`text-lg font-bold ${netProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {netProfit >= 0 ? "+" : ""}${netProfit.toLocaleString()}
+              </span>
+            </div>
+            {unconfirmedExpenses.length > 0 && (
+              <p className="text-xs text-amber-600">* 尚有未確認費用，利潤數字僅供參考</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Payment method breakdown */}
       <div className="bg-white rounded-2xl border border-[#e8ddd2] p-4 mb-4">
