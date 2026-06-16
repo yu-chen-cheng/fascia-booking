@@ -19,14 +19,25 @@ export default function NotesPage() {
   const router = useRouter();
   const { state, setNotes } = useBooking();
   const [notes, setNotesLocal] = useState(state.notes);
+  const [selected, setSelected] = useState<string[]>([]);
 
   const handleContinue = () => {
     setNotes(notes);
     router.push("/booking/confirm");
   };
 
-  const addSuggestion = (s: string) => {
-    setNotesLocal((prev) => (prev ? `${prev}、${s}` : s));
+  const toggleSuggestion = (s: string) => {
+    setSelected((prev) => {
+      if (prev.includes(s)) {
+        const next = prev.filter((x) => x !== s);
+        setNotesLocal(next.join("、"));
+        return next;
+      } else {
+        const next = [...prev, s];
+        setNotesLocal(next.join("、"));
+        return next;
+      }
+    });
   };
 
   return (
@@ -43,15 +54,22 @@ export default function NotesPage() {
         <div className="mb-4">
           <p className="text-xs text-gray-400 mb-3">快速選擇常見需求：</p>
           <div className="flex flex-wrap gap-2">
-            {SUGGESTIONS.map((s) => (
-              <button
-                key={s}
-                onClick={() => addSuggestion(s)}
-                className="px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-full text-gray-600 hover:border-[#b8956a] hover:text-[#b8956a] transition-colors active:scale-95"
-              >
-                {s}
-              </button>
-            ))}
+            {SUGGESTIONS.map((s) => {
+              const isOn = selected.includes(s);
+              return (
+                <button
+                  key={s}
+                  onClick={() => toggleSuggestion(s)}
+                  className={`px-3 py-1.5 text-sm rounded-full border transition-colors active:scale-95 ${
+                    isOn
+                      ? "bg-[#8b6748] border-[#8b6748] text-white"
+                      : "bg-white border-gray-200 text-gray-600 hover:border-[#8b6748] hover:text-[#8b6748]"
+                  }`}
+                >
+                  {isOn ? "✓ " : ""}{s}
+                </button>
+              );
+            })}
           </div>
         </div>
 
