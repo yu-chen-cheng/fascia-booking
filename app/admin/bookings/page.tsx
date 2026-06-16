@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useAdmin } from "@/lib/adminContext";
-import { ADMIN_BOOKINGS, ADMIN_STAFF, ADMIN_STORES, BookingStatus, AdminBooking } from "@/lib/adminMockData";
+import { ADMIN_BOOKINGS, ADMIN_STAFF, ADMIN_STORES, BookingStatus, AdminBooking, PaymentMethod } from "@/lib/adminMockData";
+
+const PAYMENT_METHODS: PaymentMethod[] = ["現金", "電子支付", "轉帳", "信用卡", "儲值金"];
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
@@ -26,6 +28,8 @@ export default function BookingsPage() {
   const [editBooking, setEditBooking] = useState<AdminBooking | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [noteText, setNoteText] = useState("");
+  const [checkoutBooking, setCheckoutBooking] = useState<AdminBooking | null>(null);
+  const [checkoutPayment, setCheckoutPayment] = useState<PaymentMethod>("現金");
 
   if (!user) return null;
 
@@ -45,6 +49,14 @@ export default function BookingsPage() {
 
   const updateStatus = (id: string, status: BookingStatus) => {
     setBookings(prev => prev.map(b => b.id === id ? { ...b, status } : b));
+  };
+
+  const completeWithPayment = () => {
+    if (!checkoutBooking) return;
+    setBookings(prev => prev.map(b =>
+      b.id === checkoutBooking.id ? { ...b, status: "已完成", paymentMethod: checkoutPayment } : b
+    ));
+    setCheckoutBooking(null);
   };
 
   const updateNote = (id: string, notes: string) => {
@@ -145,6 +157,7 @@ export default function BookingsPage() {
               <div>👤 {b.staffName}</div>
               <div>📍 {b.storeName}</div>
               {b.notes && <div className="col-span-2">📝 {b.notes}</div>}
+              {b.status === "已完成" && <div className="col-span-2">💳 付款方式：<span className="text-[#8b6748] font-medium">{b.paymentMethod}</span></div>}
             </div>
 
             {/* Buffer adjustment */}
@@ -176,10 +189,10 @@ export default function BookingsPage() {
               {(b.status === "待確認" || b.status === "已確認") && (
                 <>
                   <button
-                    onClick={() => updateStatus(b.id, "已完成")}
+                    onClick={() => { setCheckoutBooking(b); setCheckoutPayment(b.paymentMethod); }}
                     className="px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-lg text-xs font-medium"
                   >
-                    完成
+                    完成結帳
                   </button>
                   <button
                     onClick={() => updateStatus(b.id, "已取消")}
@@ -205,6 +218,51 @@ export default function BookingsPage() {
           </div>
         )}
       </div>
+
+      {/* Checkout modal */}
+      {checkoutBooking && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="text-base font-medium text-[#1c1c1c] mb-1">結帳確認</h3>
+            <p className="text-sm text-[#8a7a6e] mb-4">
+              {checkoutBooking.customerName} · {checkoutBooking.serviceName}
+              <span className="ml-2 text-[#8b6748] font-medium">${checkoutBooking.price.toLocaleString()}</span>
+            </p>
+            <div className="mb-4">
+              <label className="text-sm font-medium text-[#1c1c1c] mb-3 block">付款方式</label>
+              <div className="grid grid-cols-3 gap-2">
+                {PAYMENT_METHODS.map(m => (
+                  <button
+                    key={m}
+                    onClick={() => setCheckoutPayment(m)}
+                    className={`py-2.5 rounded-xl text-sm border transition-colors ${
+                      checkoutPayment === m
+                        ? "bg-[#8b6748] text-white border-[#8b6748]"
+                        : "bg-[#faf7f2] text-[#1c1c1c] border-[#e8ddd2]"
+                    }`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setCheckoutBooking(null)}
+                className="flex-1 py-2.5 border border-[#e8ddd2] rounded-xl text-sm text-[#8a7a6e]"
+              >
+                取消
+              </button>
+              <button
+                onClick={completeWithPayment}
+                className="flex-1 py-2.5 bg-[#8b6748] text-white rounded-xl text-sm font-medium"
+              >
+                確認完成
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Note modal */}
       {editBooking && (
