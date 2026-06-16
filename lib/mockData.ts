@@ -214,8 +214,8 @@ export const mockUser = {
 export function generateTimeSlots(date: Date, duration: number): TimeSlot[] {
   const slots: TimeSlot[] = [];
   const startHour = 10;
-  const endHour = 20;
-  const intervalMinutes = 10;
+  const endHour = 22;
+  const intervalMinutes = 30; // 整點與半點
 
   // Simulate some unavailable slots based on date
   const dayOfWeek = date.getDay();
