@@ -33,6 +33,11 @@ export default function RegisterPage() {
       return;
     }
 
+    // Persist registration data to localStorage
+    localStorage.setItem("fascia_user_name", form.name);
+    localStorage.setItem("fascia_user_phone", form.phone);
+    localStorage.setItem("fascia_registration_done", "true");
+
     setUser({
       id: "new001",
       name: form.name,

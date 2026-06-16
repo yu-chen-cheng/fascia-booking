@@ -175,55 +175,39 @@ export const services: Service[] = [
 export const membershipTiers = [
   {
     amount: 15000,
-    label: "銀卡會員",
+    label: "會員",
     benefits: ["享會員優惠價格"],
-    vouchers: [],
+    vouchers: [] as string[],
   },
   {
     amount: 30000,
-    label: "金卡會員",
+    label: "進階會員",
     benefits: ["享會員優惠價格", "結構訓練券 × 1"],
     vouchers: ["結構訓練券 × 1"],
   },
   {
     amount: 50000,
-    label: "白金會員",
+    label: "頂級會員",
     benefits: ["享會員優惠價格", "結構訓練券 × 1", "頻率檢測券 × 1"],
     vouchers: ["結構訓練券 × 1", "頻率檢測券 × 1"],
   },
 ];
 
 // ─── Mock User ─────────────────────────────────────────────────────────────
+// Default new user state: $0 balance, no consent, no tier
 export const mockUser = {
   id: "user001",
   name: "王小明",
   phone: "0912-345-678",
   email: "user@example.com",
   birthday: "1990-05-15",
-  isNewUser: false,
-  isMember: true,
-  storedValue: 32000,
-  totalSpent: 18000,
-  consentSigned: true,
-  vouchers: ["結構訓練券"],
-  bookingHistory: [
-    {
-      id: "bk001",
-      date: "2024-05-20",
-      store: "大安店",
-      teacher: "陳雅婷",
-      service: "頂級筋膜結構整合",
-      amount: 3800,
-    },
-    {
-      id: "bk002",
-      date: "2024-04-15",
-      store: "小巨蛋店",
-      teacher: "王思涵",
-      service: "精緻筋膜調理 90分",
-      amount: 2500,
-    },
-  ],
+  isNewUser: true,
+  isMember: false,
+  storedValue: 0,
+  totalSpent: 0,
+  consentSigned: false,
+  vouchers: [] as string[],
+  bookingHistory: [] as Array<{ id: string; date: string; store: string; teacher: string; service: string; amount: number }>,
 };
 
 // ─── Available Time Slots Generator ────────────────────────────────────────
@@ -237,12 +221,29 @@ export function generateTimeSlots(date: Date, duration: number): TimeSlot[] {
   const dayOfWeek = date.getDay();
   const unavailableHours = dayOfWeek === 0 ? [] : [11, 13, 15, 18]; // Sunday open, others have some blocks
 
+  // Check if the selected date is today; if so, filter out past slots (with 30-min buffer)
+  const now = new Date();
+  const isToday =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+  const bufferMinutes = 30;
+  const cutoffTotalMins = isToday
+    ? (now.getHours() - startHour) * 60 + now.getMinutes() + bufferMinutes
+    : -Infinity;
+
   for (let hour = startHour; hour < endHour; hour++) {
     for (let min = 0; min < 60; min += intervalMinutes) {
       // Check if enough time remains before closing
       const totalMinsFromStart = (hour - startHour) * 60 + min;
       const closingMins = (endHour - startHour) * 60;
       if (totalMinsFromStart + duration > closingMins) break;
+
+      // Skip past time slots for today (gray out by marking unavailable)
+      if (totalMinsFromStart < cutoffTotalMins) {
+        // Don't add past slots at all — they should not be selectable
+        continue;
+      }
 
       const timeStr = `${hour.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`;
 

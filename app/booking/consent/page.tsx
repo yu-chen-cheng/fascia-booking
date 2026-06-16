@@ -20,6 +20,8 @@ export default function ConsentPage() {
 
   const handleConfirm = () => {
     setConsentSigned(true);
+    // Persist consent status to localStorage so dashboard reflects it
+    localStorage.setItem("fascia_consent_signed", "true");
     router.push("/booking/store");
   };
 

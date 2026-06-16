@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { mockUser, membershipTiers } from "@/lib/mockData";
+import { membershipTiers } from "@/lib/mockData";
 import { BookingProvider } from "@/lib/bookingContext";
 
 function StatCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
@@ -17,14 +17,34 @@ function StatCard({ label, value, sub, color }: { label: string; value: string; 
 
 export default function DashboardPage() {
   const router = useRouter();
-  const user = mockUser;
   const [activeTab, setActiveTab] = useState<"overview" | "history">("overview");
 
-  const currentTier = membershipTiers.filter((t) => user.storedValue >= t.amount).pop();
-  const nextTier = membershipTiers.find((t) => user.storedValue < t.amount);
+  // Load user state from localStorage (set during registration/consent flows)
+  const [userName, setUserName] = useState("訪客");
+  const [storedValue, setStoredValue] = useState(0);
+  const [consentSigned, setConsentSigned] = useState(false);
+  const [registrationDone, setRegistrationDone] = useState(false);
+
+  useEffect(() => {
+    const name = localStorage.getItem("fascia_user_name");
+    const sv = localStorage.getItem("fascia_stored_value");
+    const consent = localStorage.getItem("fascia_consent_signed");
+    const registered = localStorage.getItem("fascia_registration_done");
+
+    if (name) setUserName(name);
+    if (sv) setStoredValue(parseInt(sv, 10));
+    if (consent === "true") setConsentSigned(true);
+    if (registered === "true") setRegistrationDone(true);
+  }, []);
+
+  // Determine SINGLE active tier — only the highest tier the user qualifies for
+  const currentTier = membershipTiers.filter((t) => storedValue >= t.amount).pop() ?? null;
+  const nextTier = membershipTiers.find((t) => storedValue < t.amount) ?? null;
   const progressToNext = nextTier
-    ? Math.min((user.storedValue / nextTier.amount) * 100, 100)
+    ? Math.min((storedValue / nextTier.amount) * 100, 100)
     : 100;
+
+  const vouchers = currentTier?.vouchers ?? [];
 
   return (
     <BookingProvider>
@@ -45,7 +65,7 @@ export default function DashboardPage() {
 
             <p className="text-xs tracking-[0.2em] text-[#b8956a] uppercase font-medium mb-1">FASCIA 法夏</p>
             <h1 className="text-2xl font-light text-white mb-1">會員中心</h1>
-            <p className="text-gray-400 text-sm">歡迎，{user.name}</p>
+            <p className="text-gray-400 text-sm">歡迎，{registrationDone ? userName : "訪客"}</p>
           </div>
         </div>
 
@@ -55,7 +75,7 @@ export default function DashboardPage() {
             <div className="flex justify-between items-start mb-4">
               <div>
                 <p className="text-white/70 text-xs mb-0.5">會員等級</p>
-                <p className="text-white font-semibold text-lg">{currentTier?.label || "一般會員"}</p>
+                <p className="text-white font-semibold text-lg">{currentTier?.label || "尚未儲值"}</p>
               </div>
               <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
                 <span className="text-white text-lg font-light">法</span>
@@ -66,12 +86,12 @@ export default function DashboardPage() {
             <div className="flex gap-4 mb-4">
               <div>
                 <p className="text-white/70 text-xs mb-0.5">儲值餘額</p>
-                <p className="text-white text-xl font-bold">${user.storedValue.toLocaleString()}</p>
+                <p className="text-white text-xl font-bold">${storedValue.toLocaleString()}</p>
               </div>
               <div className="w-px bg-white/20" />
               <div>
                 <p className="text-white/70 text-xs mb-0.5">累計消費</p>
-                <p className="text-white text-xl font-bold">${user.totalSpent.toLocaleString()}</p>
+                <p className="text-white text-xl font-bold">$0</p>
               </div>
             </div>
 
@@ -80,7 +100,7 @@ export default function DashboardPage() {
               <div>
                 <div className="flex justify-between text-xs text-white/70 mb-1">
                   <span>距離 {nextTier.label}</span>
-                  <span>${(nextTier.amount - user.storedValue).toLocaleString()} 可升級</span>
+                  <span>${(nextTier.amount - storedValue).toLocaleString()} 可升級</span>
                 </div>
                 <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
                   <div
@@ -90,7 +110,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             )}
-            {!nextTier && (
+            {!nextTier && currentTier && (
               <div className="text-white/80 text-xs">
                 ✓ 已達最高等級
               </div>
@@ -101,23 +121,23 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 gap-3 mb-6">
             <StatCard
               label="同意書狀態"
-              value={user.consentSigned ? "已簽署" : "未簽署"}
-              color={user.consentSigned ? "text-[#7a9e8e]" : "text-red-500"}
+              value={consentSigned ? "已簽署" : "未簽署"}
+              color={consentSigned ? "text-[#7a9e8e]" : "text-red-500"}
             />
             <StatCard
               label="可用券數"
-              value={`${user.vouchers.length}`}
-              sub={user.vouchers.length > 0 ? user.vouchers.join("、") : "暫無可用券"}
+              value={`${vouchers.length}`}
+              sub={vouchers.length > 0 ? vouchers.join("、") : "暫無可用券"}
               color="text-[#b8956a]"
             />
           </div>
 
           {/* Vouchers */}
-          {user.vouchers.length > 0 && (
+          {vouchers.length > 0 && (
             <div className="mb-6">
               <h2 className="text-xs tracking-[0.15em] text-[#b8956a] uppercase font-medium mb-3">優惠券</h2>
               <div className="space-y-2">
-                {user.vouchers.map((v, i) => (
+                {vouchers.map((v, i) => (
                   <div key={i} className="bg-white rounded-xl p-4 ring-1 ring-[#b8956a]/20 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-[#f5f0e8] flex items-center justify-center">
@@ -138,20 +158,20 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Membership benefits */}
+          {/* Membership benefits — only highlight the ONE active tier */}
           <div className="mb-6">
             <h2 className="text-xs tracking-[0.15em] text-[#b8956a] uppercase font-medium mb-3">儲值方案</h2>
             <div className="space-y-2">
               {membershipTiers.map((tier) => {
-                const owned = user.storedValue >= tier.amount;
+                const isActive = currentTier?.amount === tier.amount;
                 return (
                   <div
                     key={tier.amount}
-                    className={`rounded-xl p-4 transition-all ${owned ? "bg-white ring-1 ring-[#b8956a]/30" : "bg-gray-50 ring-1 ring-gray-100 opacity-60"}`}
+                    className={`rounded-xl p-4 transition-all ${isActive ? "bg-white ring-1 ring-[#b8956a]/30" : "bg-gray-50 ring-1 ring-gray-100 opacity-60"}`}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        {owned && (
+                        {isActive && (
                           <div className="w-5 h-5 rounded-full bg-[#b8956a] flex items-center justify-center">
                             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                               <path d="M2 5L4 7L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -175,22 +195,11 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Booking history */}
+          {/* Booking history — empty for new users */}
           <div>
             <h2 className="text-xs tracking-[0.15em] text-[#b8956a] uppercase font-medium mb-3">預約紀錄</h2>
-            <div className="space-y-3">
-              {user.bookingHistory.map((bk) => (
-                <div key={bk.id} className="bg-white rounded-xl p-4 ring-1 ring-gray-100 shadow-sm">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-sm font-medium text-[#1a1a1a]">{bk.service}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{bk.store} · {bk.teacher}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{bk.date}</p>
-                    </div>
-                    <span className="text-sm font-semibold text-[#b8956a]">${bk.amount.toLocaleString()}</span>
-                  </div>
-                </div>
-              ))}
+            <div className="bg-white rounded-xl p-6 ring-1 ring-gray-100 text-center">
+              <p className="text-sm text-gray-400">暫無預約紀錄</p>
             </div>
           </div>
         </div>
