@@ -44,12 +44,12 @@ export default function BookingHeader({
   const progress = step !== undefined ? ((step) / totalSteps) * 100 : undefined;
 
   return (
-    <div className="sticky top-0 z-50 bg-[#fafaf8]/95 backdrop-blur-sm border-b border-gray-100">
+    <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-[#e8ddd2]">
       {/* Progress bar */}
       {progress !== undefined && (
         <div className="h-0.5 bg-gray-100">
           <div
-            className="h-full bg-gradient-to-r from-[#b8956a] to-[#7a9e8e] transition-all duration-500"
+            className="h-full bg-gradient-to-r from-[#8b6748] to-[#7a9e8e] transition-all duration-500"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -81,7 +81,7 @@ export default function BookingHeader({
 
           <div className="flex-1">
             {/* Brand */}
-            <p className="text-[10px] tracking-[0.2em] text-[#b8956a] uppercase font-medium">
+            <p className="text-[10px] tracking-[0.2em] text-[#8b6748] uppercase font-medium">
               FASCIA 法夏
             </p>
             <h1 className="text-lg font-semibold text-[#1a1a1a] leading-tight">
@@ -111,9 +111,9 @@ export default function BookingHeader({
                 title={s}
                 className={`flex-shrink-0 h-1.5 rounded-full transition-all duration-300 ${
                   i + 1 < step
-                    ? "w-4 bg-[#b8956a]"
+                    ? "w-4 bg-[#8b6748]"
                     : i + 1 === step
-                    ? "w-6 bg-[#b8956a]"
+                    ? "w-6 bg-[#8b6748]"
                     : "w-1.5 bg-gray-200"
                 }`}
               />
