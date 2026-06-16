@@ -47,7 +47,7 @@ export const stores: Store[] = [
     mapEmbedUrl:
       "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3614.2!2d121.5538!3d25.0521!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2z5piO5YyX5biC5p6X5bGx5Y2A5Y2X5Lqs5p2x6KGX5ZCI5q615Lu95ZCI5L2N5q615Lu9MTMz5Y2X4bm05byg77yR5Lu95qC55Y-w!5e0!3m2!1szh-TW!2stw!4v1234567890",
     phone: "02-XXXX-XXXX",
-    hours: "週二至週日 10:00–20:00",
+    hours: "每週一至週日 10:00–22:00",
   },
   {
     id: "daan",
@@ -56,7 +56,7 @@ export const stores: Store[] = [
     mapEmbedUrl:
       "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3615.0!2d121.5433!3d25.0330!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2z5piO5YyX5biC5aSn5a6J5Y2A5L-h5YqJ6Lev5ZubDTMw5Y2X77yH5byg77yR5Lu95Y-w!5e0!3m2!1szh-TW!2stw!4v1234567891",
     phone: "02-XXXX-XXXX",
-    hours: "週二至週日 10:00–20:00",
+    hours: "每週一至週日 10:00–22:00",
   },
   {
     id: "banqiao",

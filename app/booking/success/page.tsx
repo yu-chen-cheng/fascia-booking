@@ -120,6 +120,17 @@ export default function SuccessPage() {
           </svg>
           <p className="text-xs text-[#1a7a45]">LINE 確認通知已發送至您的帳號</p>
         </div>
+
+        {/* Post-care reminder */}
+        <div className="mt-3 bg-[#f5f0e8] border border-[#d4b896]/30 rounded-xl p-4">
+          <p className="text-xs font-medium text-[#b8956a] mb-1">調理後照護提醒</p>
+          <p className="text-xs text-gray-500 leading-relaxed">
+            調理結束後 24–72 小時內，請多補充水分、充分休息，讓身體筋膜充分修復，效果更好。
+          </p>
+          <p className="text-xs text-gray-400 mt-2">
+            ※ 若 7 天內尚未預約下次調理，系統將透過 LINE 提醒您。
+          </p>
+        </div>
       </div>
 
       {/* Action buttons */}
