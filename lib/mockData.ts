@@ -131,7 +131,7 @@ export const services: Service[] = [
   },
   {
     id: "refined-90",
-    name: "精緻筋膜調理 90分",
+    name: "精緻筋膜調理",
     duration: 90,
     priceRegular: { "技師職人": 3200, "技術長": 3800 },
     priceMember: { "技師職人": 2500, "技術長": 3200 },
@@ -141,7 +141,7 @@ export const services: Service[] = [
   },
   {
     id: "refined-60",
-    name: "精緻筋膜調理 60分",
+    name: "基礎筋膜放鬆",
     duration: 60,
     priceRegular: { "技師職人": 2500, "技術長": 3000 },
     priceMember: { "技師職人": 2000, "技術長": 2500 },
