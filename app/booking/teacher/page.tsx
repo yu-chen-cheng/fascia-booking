@@ -72,18 +72,10 @@ export default function TeacherPage() {
           return (
             <div
               key={teacher.id}
-              onClick={() => {
-                setSelected(teacher);
-                setSelectedTeacher(teacher);
-                setTimeout(() => router.push("/booking/service"), 150);
-              }}
-              className={`w-full rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 active:scale-[0.98] ${theme.card} ${
-                isSelected
-                  ? `ring-2 ${theme.ringSelected} shadow-md`
-                  : `ring-1 ${theme.ring} shadow-sm`
-              }`}
+              onClick={() => setBioOpen(teacher.id)}
+              className={`w-full rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 active:scale-[0.98] ${theme.card} ring-1 ${theme.ring} shadow-sm hover:shadow-md`}
             >
-              <div className="flex items-center gap-4 px-4 py-3.5">
+              <div className="flex items-center gap-4 px-4 py-4">
                 {/* Avatar */}
                 <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${theme.avatar} flex items-center justify-center shadow-sm flex-shrink-0`}>
                   <span className="text-xl text-white font-light">
@@ -102,30 +94,12 @@ export default function TeacherPage() {
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-50 text-orange-500 border border-orange-200 font-medium">內部</span>
                     )}
                   </div>
-                  <p className="text-xs text-gray-500 leading-snug line-clamp-2">{teacher.tagline}</p>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setBioOpen(bioOpen === teacher.id ? null : teacher.id);
-                    }}
-                    className="mt-1.5 text-[11px] text-[#b8956a] hover:underline"
-                  >
-                    查看介紹
-                  </button>
+                  <p className="text-sm text-gray-500 leading-snug">{teacher.tagline}</p>
                 </div>
 
-                {/* Selection indicator */}
-                {isSelected ? (
-                  <div className="w-7 h-7 rounded-full bg-[#b8956a] flex items-center justify-center flex-shrink-0">
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path d="M2.5 7L5.5 10L11.5 4" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                ) : (
-                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="text-gray-300 flex-shrink-0">
-                    <path d="M7 13l4-4-4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                )}
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="text-gray-300 flex-shrink-0">
+                  <path d="M7 13l4-4-4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
               </div>
             </div>
           );
