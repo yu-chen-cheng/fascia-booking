@@ -20,6 +20,8 @@ export default function LoginPage() {
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [isLocalhost, setIsLocalhost] = useState(false);
   const [showPwaHint, setShowPwaHint] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<Event & { prompt: () => void } | null>(null);
+  const [showAndroidInstall, setShowAndroidInstall] = useState(false);
 
   // On mount: detect localhost and auto-handle already-logged-in LIFF users
   useEffect(() => {
@@ -28,14 +30,26 @@ export default function LoginPage() {
       window.location.hostname === "127.0.0.1";
     setIsLocalhost(isLocal);
 
-    // Show PWA install hint on iOS Safari (not in standalone mode, not in LIFF)
-    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
     const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
-    const isLiff = window.location.href.includes("liff.line.me") || navigator.userAgent.includes("Line");
+    const isLiff = navigator.userAgent.includes("Line") || window.location.href.includes("liff.line.me");
     const hintDismissed = localStorage.getItem("fascia_pwa_hint_dismissed");
+
+    // iOS Safari hint
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
     if (isIOS && !isStandalone && !isLiff && !hintDismissed) {
       setShowPwaHint(true);
     }
+
+    // Android Chrome: capture beforeinstallprompt
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      if (!isStandalone && !isLiff && !hintDismissed) {
+        setDeferredPrompt(e as Event & { prompt: () => void });
+        setShowAndroidInstall(true);
+      }
+    };
+    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
+    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
 
     if (!isLocal) {
       // Try to silently initialise LIFF and redirect if already logged in
@@ -238,6 +252,51 @@ export default function LoginPage() {
           登入即表示您同意我們的服務條款及隱私權政策
         </p>
       </div>
+
+      {/* Android PWA install prompt */}
+      {showAndroidInstall && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 mx-auto max-w-lg">
+          <div className="m-3 bg-[#1c1c1e] text-white rounded-2xl p-4 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#b8956a] to-[#8b6748] flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-base text-white font-light">法</span>
+                </div>
+                <div>
+                  <p className="text-sm font-medium mb-1">安裝 FASCIA 法夏預約</p>
+                  <p className="text-xs text-gray-400">加到主畫面，開啟更快速，沒有網址列干擾</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  localStorage.setItem("fascia_pwa_hint_dismissed", "1");
+                  setShowAndroidInstall(false);
+                }}
+                className="text-gray-500 text-lg leading-none flex-shrink-0 mt-0.5"
+              >✕</button>
+            </div>
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={() => {
+                  localStorage.setItem("fascia_pwa_hint_dismissed", "1");
+                  setShowAndroidInstall(false);
+                }}
+                className="flex-1 py-2 text-sm text-gray-400 border border-gray-600 rounded-xl"
+              >稍後再說</button>
+              <button
+                onClick={async () => {
+                  if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    localStorage.setItem("fascia_pwa_hint_dismissed", "1");
+                    setShowAndroidInstall(false);
+                  }
+                }}
+                className="flex-1 py-2 text-sm font-medium bg-[#8b6748] text-white rounded-xl"
+              >立即安裝</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* iOS PWA install hint */}
       {showPwaHint && (
