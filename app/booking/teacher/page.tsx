@@ -141,8 +141,10 @@ export default function TeacherPage() {
                     </div>
                   </div>
 
-                  <p className="text-sm text-gray-600 leading-relaxed mb-4">{t.bio}</p>
+                  {/* Bio text */}
+                  <p className="text-sm text-gray-600 leading-relaxed mb-4 whitespace-pre-line">{t.bio}</p>
 
+                  {/* Specialties */}
                   <div className="mb-4">
                     <h4 className="text-xs tracking-[0.15em] text-[#b8956a] uppercase font-medium mb-2">專長</h4>
                     <div className="flex flex-wrap gap-2">
@@ -154,7 +156,24 @@ export default function TeacherPage() {
                     </div>
                   </div>
 
-                  <p className="text-xs text-gray-400">執業經驗 {t.yearsExp} 年</p>
+                  {/* Certifications */}
+                  {t.certifications.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="text-xs tracking-[0.15em] text-[#b8956a] uppercase font-medium mb-2">專業研習與認證</h4>
+                      <ul className="space-y-1.5">
+                        {t.certifications.map((cert) => (
+                          <li key={cert} className="flex items-start gap-2">
+                            <span className="text-[#b8956a] mt-0.5 flex-shrink-0">·</span>
+                            <span className="text-xs text-gray-500 leading-snug">{cert}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {t.yearsExp > 0 && (
+                    <p className="text-xs text-gray-400">執業經驗 {t.yearsExp} 年</p>
+                  )}
 
                   <button
                     onClick={() => {
