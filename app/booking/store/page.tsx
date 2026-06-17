@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useBooking } from "@/lib/bookingContext";
 import { stores, Store } from "@/lib/mockData";
 import BookingHeader from "@/components/BookingHeader";
-import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 
 export default function StorePage() {
@@ -14,16 +13,6 @@ export default function StorePage() {
   const [selected, setSelected] = useState<Store | null>(state.selectedStore);
   const [mapOpen, setMapOpen] = useState<string | null>(null);
   const [shaking, setShaking] = useState(false);
-
-  const handleContinue = () => {
-    if (!selected) {
-      setShaking(true);
-      setTimeout(() => setShaking(false), 500);
-      return;
-    }
-    setSelectedStore(selected);
-    router.push("/booking/teacher");
-  };
 
   const availableStores = stores.filter((s) => !s.comingSoon);
 
@@ -51,8 +40,10 @@ export default function StorePage() {
             <Card
               selected={selected?.id === store.id}
               onClick={() => {
+                setSelectedStore(store);
                 setSelected(store);
                 setMapOpen(null);
+                setTimeout(() => router.push("/booking/teacher"), 150);
               }}
               hoverable
             >
@@ -139,14 +130,6 @@ export default function StorePage() {
         </Card>
       </div>
 
-      {/* Bottom CTA */}
-      <div className="px-6 pt-4 bg-[#fafaf8] border-t border-gray-100" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
-        <div className={shaking ? "shake" : ""}>
-          <Button fullWidth size="lg" onClick={handleContinue} disabled={!selected}>
-            {selected ? `確認選擇 ${selected.name}` : "請選擇門市"}
-          </Button>
-        </div>
-      </div>
     </div>
     </>
   );

@@ -1,185 +1,148 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useBooking } from "@/lib/bookingContext";
 
-const LIFF_URL = `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID}`;
-
 const DAYS_CN = ["日", "一", "二", "三", "四", "五", "六"];
+
+function DetailRow({ icon, label, value, valueClass = "" }: { icon: string; label: string; value: string; valueClass?: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="text-base flex-shrink-0 mt-0.5">{icon}</span>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-gray-400">{label}</p>
+        <p className={`text-sm font-medium text-[#1a1a1a] leading-snug ${valueClass}`}>{value}</p>
+      </div>
+    </div>
+  );
+}
 
 export default function SuccessPage() {
   const router = useRouter();
   const { state, resetBooking, getTotalPrice } = useBooking();
+  const [showStamp, setShowStamp] = useState(false);
 
-  const { selectedStore, selectedTeacher, selectedService, selectedDate, selectedTime, hasAddon, user } = state;
+  useEffect(() => {
+    const t = setTimeout(() => setShowStamp(true), 300);
+    return () => clearTimeout(t);
+  }, []);
+
+  const { selectedStore, selectedTeacher, selectedServices, selectedService, selectedDate, selectedTime, hasAddon, notes } = state;
+
+  const displayServices = selectedServices && selectedServices.length > 0
+    ? selectedServices
+    : selectedService ? [selectedService] : [];
 
   const dateStr = selectedDate
     ? `${selectedDate.getFullYear()}年${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日（${DAYS_CN[selectedDate.getDay()]}）`
     : "—";
 
-  const bookingNo = `FB${Date.now().toString().slice(-8)}`;
+  const bookingNo = `FC${new Date().getFullYear()}${String(new Date().getMonth()+1).padStart(2,'0')}${String(new Date().getDate()).padStart(2,'0')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1a1a1a] via-[#2d2520] to-[#1a1a1a] flex flex-col items-center justify-center px-6 py-12">
-      {/* Success animation */}
-      <div className="relative mb-8">
-        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#b8956a] to-[#d4b896] flex items-center justify-center shadow-xl shadow-[#b8956a]/40">
-          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-            <path
-              d="M8 20L16 28L32 12"
-              stroke="white"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
-        {/* Ripple effect */}
-        <div className="absolute inset-0 rounded-full bg-[#b8956a]/20 animate-ping" />
-      </div>
+    <div className="flex flex-col bg-[#faf7f2]" style={{ minHeight: '100dvh' }}>
+      {/* Top accent bar */}
+      <div className="h-1.5 bg-gradient-to-r from-[#8b6748] via-[#c4a882] to-[#8b6748]" />
 
-      <h1 className="text-2xl font-light text-white tracking-wide mb-2">預約成功！</h1>
-      <p className="text-[#b8956a] text-sm mb-8">LINE 確認通知已發送</p>
+      <div className="flex-1 px-5 py-8 flex flex-col items-center">
 
-      {/* Booking card */}
-      <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-xl">
-        {/* Header */}
-        <div className="text-center mb-5 pb-4 border-b border-gray-100">
-          <p className="text-xs tracking-[0.2em] text-[#b8956a] uppercase font-medium mb-1">
-            FASCIA 法夏
-          </p>
-          <p className="text-lg font-semibold text-[#1a1a1a]">預約確認單</p>
-          <p className="text-xs text-gray-400 mt-1">預約編號：{bookingNo}</p>
+        {/* Animated stamp */}
+        <div
+          className="relative mb-5"
+          style={{
+            opacity: showStamp ? 1 : 0,
+            transform: showStamp ? 'scale(1)' : 'scale(0.6)',
+            transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+          }}
+        >
+          <div className="w-20 h-20 rounded-full border-[3px] border-[#2d8a52] flex items-center justify-center bg-white shadow-md">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+              <path d="M6 16L13 23L26 9" stroke="#2d8a52" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
         </div>
 
-        {/* Details */}
-        <div className="space-y-3 text-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[#f5f0e8] flex items-center justify-center flex-shrink-0">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#b8956a" strokeWidth="1.5">
-                <path d="M7 1C4.791 1 3 2.791 3 5c0 3.25 4 8 4 8s4-4.75 4-8c0-2.209-1.791-4-4-4z" />
-                <circle cx="7" cy="5" r="1.25" />
-              </svg>
-            </div>
+        <h1 className="text-xl font-semibold text-[#1a1a1a] mb-1">預約已確認</h1>
+        <p className="text-sm text-[#2d8a52] font-medium mb-6">我們期待在 {dateStr} 見到您</p>
+
+        {/* Receipt */}
+        <div className="w-full max-w-sm bg-white rounded-3xl shadow-lg overflow-hidden">
+          {/* Receipt header */}
+          <div className="bg-[#8b6748] px-6 py-4 flex items-center justify-between">
             <div>
-              <p className="text-xs text-gray-400">門市</p>
-              <p className="font-medium text-[#1a1a1a]">{selectedStore?.name}</p>
+              <p className="text-xs text-[#d4b896] tracking-[0.2em] uppercase font-medium">FASCIA 法夏</p>
+              <p className="text-white font-semibold text-base mt-0.5">預約確認單</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-[#d4b896]">確認編號</p>
+              <p className="text-white font-mono text-sm font-bold tracking-wider">{bookingNo}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[#f5f0e8] flex items-center justify-center flex-shrink-0">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#b8956a" strokeWidth="1.5">
-                <circle cx="7" cy="5" r="2.5" />
-                <path d="M2 12c0-2.761 2.239-5 5-5s5 2.239 5 5" strokeLinecap="round" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400">技師</p>
-              <p className="font-medium text-[#1a1a1a]">{selectedTeacher?.name} {selectedTeacher?.level}</p>
-            </div>
+          {/* Ticket notch divider */}
+          <div className="relative h-4 bg-white">
+            <div className="absolute -left-3 top-1 w-6 h-6 rounded-full bg-[#faf7f2]" />
+            <div className="absolute -right-3 top-1 w-6 h-6 rounded-full bg-[#faf7f2]" />
+            <div className="absolute inset-x-4 top-3 border-t-2 border-dashed border-gray-100" />
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[#f5f0e8] flex items-center justify-center flex-shrink-0">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#b8956a" strokeWidth="1.5">
-                <rect x="2" y="3" width="10" height="9" rx="1.5" />
-                <path d="M2 6h10M5 2v2M9 2v2" strokeLinecap="round" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400">日期時間</p>
-              <p className="font-medium text-[#1a1a1a]">{dateStr}</p>
-              <p className="text-[#b8956a] font-semibold">{selectedTime}</p>
-            </div>
+          {/* Booking details */}
+          <div className="px-6 pt-1 pb-5 space-y-3.5">
+            <DetailRow icon="📅" label="日期時間" value={`${dateStr}　${selectedTime || ""}`} valueClass="text-[#8b6748] font-semibold" />
+            <DetailRow icon="📍" label="門市地點" value={selectedStore?.name || "—"} />
+            <DetailRow icon="👤" label="專屬技師" value={selectedTeacher ? `${selectedTeacher.name} ${selectedTeacher.level}` : "—"} />
+            <DetailRow icon="✨" label="服務項目" value={displayServices.map(s => s.name).join("、") + (hasAddon ? " ＋加購20分" : "") || "—"} />
+            {notes && <DetailRow icon="📝" label="備註" value={notes} />}
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[#f5f0e8] flex items-center justify-center flex-shrink-0">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#b8956a" strokeWidth="1.5">
-                <path d="M7 1.5L8.545 5.29l3.955.575-2.864 2.789.676 3.938L7 10.665l-3.312 1.927.676-3.938L1.5 5.865l3.955-.575L7 1.5z" />
-              </svg>
-            </div>
+          {/* Notch divider before price */}
+          <div className="relative h-4 bg-white mx-0">
+            <div className="absolute -left-3 top-1 w-6 h-6 rounded-full bg-[#faf7f2]" />
+            <div className="absolute -right-3 top-1 w-6 h-6 rounded-full bg-[#faf7f2]" />
+            <div className="absolute inset-x-4 top-3 border-t-2 border-dashed border-gray-100" />
+          </div>
+
+          {/* Price */}
+          <div className="px-6 pt-2 pb-5 flex justify-between items-center">
+            <span className="text-sm text-gray-500">費用總計</span>
+            <span className="text-2xl font-bold text-[#8b6748]">${getTotalPrice().toLocaleString()}</span>
+          </div>
+
+          {/* LINE notification */}
+          <div className="mx-4 mb-4 bg-[#f0faf4] border border-[#06C755]/20 rounded-2xl px-4 py-3 flex items-center gap-3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#06C755" className="flex-shrink-0">
+              <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/>
+            </svg>
             <div>
-              <p className="text-xs text-gray-400">服務</p>
-              <p className="font-medium text-[#1a1a1a]">{selectedService?.name}{hasAddon ? " + 加購20分" : ""}</p>
+              <p className="text-xs font-medium text-[#1a7a45]">LINE 通知已發送</p>
+              <p className="text-xs text-gray-500 mt-0.5">請留意 FASCIA 法夏的訊息</p>
             </div>
           </div>
         </div>
 
-        {/* Price */}
-        <div className="mt-5 pt-4 border-t border-gray-100 flex justify-between items-center">
-          <span className="text-sm text-gray-500">費用</span>
-          <span className="text-xl font-bold text-[#b8956a]">${getTotalPrice().toLocaleString()}</span>
+        {/* Post-care */}
+        <div className="w-full max-w-sm mt-4 bg-white rounded-2xl px-5 py-4 border border-[#e8ddd2]">
+          <p className="text-xs font-semibold text-[#8b6748] mb-1.5">調理後照護提醒</p>
+          <p className="text-xs text-gray-500 leading-relaxed">調理結束後 24–72 小時多補充水分、充分休息，讓筋膜充分修復。</p>
         </div>
 
-        {/* LINE notification note */}
-        <div className="mt-4 bg-[#f0faf4] border border-[#06C755]/20 rounded-xl p-3 flex items-center gap-2">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="#06C755">
-            <path d="M13.333 6.853C13.333 3.947 10.667 1.333 8 1.333S2.667 3.947 2.667 6.853c0 3.36 2.773 6.18 6.653 6.787.266.053.64.173.733.4.08.213.053.52.027.72l-.12.693c-.04.213-.173.84.72.453.893-.386 4.72-2.787 6.44-4.773A6.37 6.37 0 0013.333 6.853z" />
-          </svg>
-          <p className="text-xs text-[#1a7a45]">LINE 確認通知已發送至您的帳號</p>
-        </div>
-
-        {/* Post-care reminder */}
-        <div className="mt-3 bg-[#f5f0e8] border border-[#d4b896]/30 rounded-xl p-4">
-          <p className="text-xs font-medium text-[#b8956a] mb-1">調理後照護提醒</p>
-          <p className="text-xs text-gray-500 leading-relaxed">
-            調理結束後 24–72 小時內，請多補充水分、充分休息，讓身體筋膜充分修復，效果更好。
-          </p>
-          <p className="text-xs text-gray-400 mt-2">
-            ※ 若 7 天內尚未預約下次調理，系統將透過 LINE 提醒您。
-          </p>
-        </div>
-      </div>
-
-      {/* Action buttons */}
-      {/* Share / bookmark LIFF URL */}
-      <div className="w-full max-w-sm mt-4 bg-white/10 rounded-2xl px-5 py-3 flex items-center gap-3">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="#06C755" className="flex-shrink-0">
-          <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
-        </svg>
-        <div className="min-w-0">
-          <p className="text-xs text-white/70 mb-0.5">下次預約直接開啟</p>
-          <a
-            href={LIFF_URL}
-            className="text-xs text-[#06C755] underline break-all"
-            target="_blank"
-            rel="noreferrer"
+        {/* Actions */}
+        <div className="w-full max-w-sm mt-6 space-y-3" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+          <button
+            onClick={() => { resetBooking(); router.push("/booking/store"); }}
+            className="w-full py-4 bg-[#8b6748] text-white text-base font-medium rounded-2xl shadow-md active:scale-[0.97] transition-all"
           >
-            {LIFF_URL}
-          </a>
+            再次預約
+          </button>
+          <button
+            onClick={() => { resetBooking(); router.push("/"); }}
+            className="w-full py-3 text-sm text-gray-400"
+          >
+            返回首頁
+          </button>
         </div>
-      </div>
 
-      <div className="w-full max-w-sm mt-3 space-y-3">
-        <button
-          onClick={() => {
-            resetBooking();
-            router.push("/booking/store");
-          }}
-          className="w-full py-4 bg-[#b8956a] text-white text-base font-medium rounded-2xl shadow-lg shadow-[#b8956a]/30 hover:bg-[#a07d58] transition-all duration-200 active:scale-[0.97]"
-        >
-          再次預約
-        </button>
-        <button
-          onClick={() => {
-            resetBooking();
-            router.push("/dashboard");
-          }}
-          className="w-full py-4 border border-white/20 text-white text-base font-medium rounded-2xl hover:bg-white/10 transition-all duration-200 active:scale-[0.97]"
-        >
-          前往會員中心
-        </button>
-        <button
-          onClick={() => {
-            resetBooking();
-            router.push("/");
-          }}
-          className="w-full py-3 text-sm text-gray-400 hover:text-gray-300 transition-colors"
-        >
-          返回首頁
-        </button>
       </div>
     </div>
   );

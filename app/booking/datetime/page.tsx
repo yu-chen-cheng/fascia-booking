@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useBooking } from "@/lib/bookingContext";
 import { generateTimeSlots } from "@/lib/mockData";
 import BookingHeader from "@/components/BookingHeader";
-import Button from "@/components/ui/Button";
 
 const DAYS_CN = ["日", "一", "二", "三", "四", "五", "六"];
 const MONTHS_CN = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"];
@@ -61,13 +60,6 @@ export default function DateTimePage() {
   const nextMonth = () => {
     if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0); }
     else setViewMonth(m => m + 1);
-  };
-
-  const handleContinue = () => {
-    if (!selectedDay || !selectedTime) return;
-    setSelectedDate(selectedDay);
-    setSelectedTime(selectedTime);
-    router.push("/booking/notes");
   };
 
   const formatDate = (d: Date) =>
@@ -165,7 +157,13 @@ export default function DateTimePage() {
                 {slots.map((slot) => (
                   <button
                     key={slot.time}
-                    onClick={() => slot.available && setSelectedTimeLocal(slot.time)}
+                    onClick={() => {
+                      if (!slot.available || !selectedDay) return;
+                      setSelectedTimeLocal(slot.time);
+                      setSelectedDate(selectedDay);
+                      setSelectedTime(slot.time);
+                      setTimeout(() => router.push("/booking/confirm"), 150);
+                    }}
                     disabled={!slot.available}
                     className={`py-2.5 px-1 rounded-xl text-sm font-medium transition-all duration-150 ${
                       selectedTime === slot.time
@@ -199,25 +197,6 @@ export default function DateTimePage() {
         )}
       </div>
 
-      {/* Bottom CTA */}
-      <div className="px-6 pt-4 bg-[#fafaf8] border-t border-gray-100" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
-        {selectedDay && selectedTime && (
-          <div className="mb-3 p-3 bg-[#f5f0e8] rounded-xl">
-            <p className="text-sm text-[#1a1a1a] font-medium">
-              {formatDate(selectedDay)} {selectedTime}
-            </p>
-            <p className="text-xs text-gray-500">調理時長 {duration} 分鐘</p>
-          </div>
-        )}
-        <Button
-          fullWidth
-          size="lg"
-          onClick={handleContinue}
-          disabled={!selectedDay || !selectedTime}
-        >
-          {selectedTime ? "確認時間" : "請選擇時間"}
-        </Button>
-      </div>
     </div>
   );
 }

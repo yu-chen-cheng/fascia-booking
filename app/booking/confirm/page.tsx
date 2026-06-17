@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useBooking } from "@/lib/bookingContext";
 import BookingHeader from "@/components/BookingHeader";
@@ -20,7 +21,16 @@ function Row({ label, value, highlight }: { label: string; value: string; highli
 
 export default function ConfirmPage() {
   const router = useRouter();
-  const { state, getTotalPrice } = useBooking();
+  const { state, getTotalPrice, setNotes } = useBooking();
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [noteTags, setNoteTags] = useState<string[]>([]);
+  const [localNotes, setLocalNotes] = useState(state.notes || "");
+
+  const toggleNote = (s: string) => {
+    const next = noteTags.includes(s) ? noteTags.filter(x => x !== s) : [...noteTags, s];
+    setNoteTags(next);
+    setLocalNotes(next.join("、"));
+  };
 
   const {
     selectedStore,
@@ -55,6 +65,7 @@ export default function ConfirmPage() {
       : 0) + (hasAddon ? 20 : 0);
 
   const handleConfirm = () => {
+    setNotes(localNotes);
     router.push("/booking/success");
   };
 
@@ -128,6 +139,38 @@ export default function ConfirmPage() {
           </h3>
           <Row label="姓名" value={user?.name || "—"} />
           <Row label="手機" value={user?.phone || "—"} />
+        </div>
+
+        {/* Optional notes */}
+        <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
+          <button
+            onClick={() => setNotesOpen(o => !o)}
+            className="w-full flex items-center justify-between px-5 py-4"
+          >
+            <span className="text-xs tracking-[0.15em] text-[#b8956a] uppercase font-medium">調理前備註（選填）</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#b8956a" strokeWidth="1.5" style={{ transform: notesOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+              <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          {notesOpen && (
+            <div className="px-5 pb-5">
+              <div className="flex flex-wrap gap-2 mb-3">
+                {["腰部長期痠痛","肩頸緊繃","久坐辦公室","運動後恢復","姿勢矯正需求","頭痛問題"].map(s => (
+                  <button key={s} onClick={() => toggleNote(s)}
+                    className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${noteTags.includes(s) ? "bg-[#8b6748] border-[#8b6748] text-white" : "bg-white border-gray-200 text-gray-600"}`}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                value={localNotes}
+                onChange={e => setLocalNotes(e.target.value)}
+                placeholder="其他需要告訴技師的事項..."
+                rows={3}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm resize-none outline-none focus:border-[#b8956a] transition-colors"
+              />
+            </div>
+          )}
         </div>
 
         {/* Edit reminder */}

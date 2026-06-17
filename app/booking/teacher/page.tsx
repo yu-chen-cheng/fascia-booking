@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useBooking } from "@/lib/bookingContext";
 import { teachers, Teacher } from "@/lib/mockData";
 import BookingHeader from "@/components/BookingHeader";
-import Button from "@/components/ui/Button";
 
 const LEVEL_COLORS: Record<string, string> = {
   "技術長": "bg-amber-50 text-amber-700 border-amber-200",
@@ -22,16 +21,6 @@ export default function TeacherPage() {
   const storeTeachers = teachers.filter(
     (t) => !state.selectedStore || t.storeIds.includes(state.selectedStore.id)
   );
-
-  const handleContinue = () => {
-    if (!selected) {
-      setShaking(true);
-      setTimeout(() => setShaking(false), 500);
-      return;
-    }
-    setSelectedTeacher(selected);
-    router.push("/booking/service");
-  };
 
   return (
     <>
@@ -56,7 +45,11 @@ export default function TeacherPage() {
           {storeTeachers.map((teacher) => (
             <div key={teacher.id}>
               <div
-                onClick={() => setSelected(teacher)}
+                onClick={() => {
+                  setSelected(teacher);
+                  setSelectedTeacher(teacher);
+                  setTimeout(() => router.push("/booking/service"), 150);
+                }}
                 className={`bg-white rounded-2xl overflow-hidden transition-all duration-200 cursor-pointer active:scale-[0.97] ${
                   selected?.id === teacher.id
                     ? "ring-2 ring-[#b8956a] shadow-md"
@@ -171,14 +164,6 @@ export default function TeacherPage() {
         </div>
       )}
 
-      {/* Bottom CTA */}
-      <div className="px-6 pt-4 bg-[#fafaf8] border-t border-gray-100" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
-        <div className={shaking ? "shake" : ""}>
-          <Button fullWidth size="lg" onClick={handleContinue} disabled={!selected}>
-            {selected ? `確認選擇 ${selected.name}` : "請選擇技師"}
-          </Button>
-        </div>
-      </div>
     </div>
     </>
   );
