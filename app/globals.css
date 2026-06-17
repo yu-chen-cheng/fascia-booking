@@ -28,11 +28,24 @@
   --color-border: var(--border);
 }
 
+html, body {
+  height: 100%;
+  /* Use dynamic viewport height so Safari's URL bar doesn't overlap content */
+  min-height: 100dvh;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: "Noto Serif TC", "PingFang TC", "Hiragino Sans GB", serif;
   -webkit-font-smoothing: antialiased;
+  /* Prevent rubber-band scroll from exposing background */
+  overscroll-behavior: none;
+}
+
+/* Fixed bottom CTA bars clear Safari's home indicator */
+.bottom-cta {
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
 }
 
 .rdp {

@@ -9,15 +9,22 @@ const notoSerifTC = Noto_Serif_TC({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "FASCIA 法夏・筋膜結構美學",
-  description: "專業筋膜調理預約系統",
-};
-
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: "cover",
+};
+
+export const metadata: Metadata = {
+  title: "FASCIA 法夏・筋膜結構美學",
+  description: "專業筋膜調理預約系統",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "FASCIA 法夏",
+  },
 };
 
 export default function RootLayout({

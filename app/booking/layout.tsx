@@ -7,8 +7,8 @@ export default function BookingLayout({
 }) {
   return (
     <BookingProvider>
-      <div className="min-h-screen bg-[#fafaf8] flex flex-col">
-        <div className="flex-1 max-w-lg mx-auto w-full">
+      <div className="bg-[#fafaf8] flex flex-col" style={{ minHeight: "100dvh" }}>
+        <div className="flex-1 max-w-lg mx-auto w-full flex flex-col">
           {children}
         </div>
       </div>
