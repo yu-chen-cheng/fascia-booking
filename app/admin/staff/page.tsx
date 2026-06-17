@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { useAdmin } from "@/lib/adminContext";
-import { ADMIN_STAFF, ADMIN_STORES, AdminStaff, InternalLevel, DisplayLevel, EmploymentType } from "@/lib/adminMockData";
+import { ADMIN_STAFF, ADMIN_STORES, ADMIN_SERVICES, AdminStaff, InternalLevel, DisplayLevel, EmploymentType } from "@/lib/adminMockData";
 import { useRouter } from "next/navigation";
 
 const INTERNAL_LEVELS: InternalLevel[] = ["實習技師", "準技師", "初階老師", "進階老師", "資深老師", "技術長"];
-const DISPLAY_LEVELS: DisplayLevel[] = ["技師職人", "技術長"];
+const DISPLAY_LEVELS: DisplayLevel[] = ["技師職人", "技術長", "準技師", "實習技師"];
 
 export default function StaffPage() {
   const { user } = useAdmin();
@@ -22,6 +22,7 @@ export default function StaffPage() {
     baseSalary: 0,
     commissionPerSession: 500,
     positionAllowance: 0,
+    allowedServiceIds: [],
   });
 
   if (!user) return null;
@@ -42,9 +43,25 @@ export default function StaffPage() {
 
   const addNewStaff = () => {
     const id = `S${String(staff.length + 1).padStart(3, "0")}`;
-    setStaff(prev => [...prev, { ...newStaff, id, username: `staff${staff.length + 1}` } as AdminStaff]);
+    setStaff(prev => [...prev, { ...newStaff, id, username: `staff${staff.length + 1}`, allowedServiceIds: newStaff.allowedServiceIds ?? [] } as AdminStaff]);
     setShowAddModal(false);
-    setNewStaff({ internalLevel: "初階老師", displayLevel: "技師職人", storeId: "ST01", employmentType: "承攬制", baseSalary: 0, commissionPerSession: 500, positionAllowance: 0 });
+    setNewStaff({ internalLevel: "初階老師", displayLevel: "技師職人", storeId: "ST01", employmentType: "承攬制", baseSalary: 0, commissionPerSession: 500, positionAllowance: 0, allowedServiceIds: [] });
+  };
+
+  const toggleServiceForStaff = (staffObj: AdminStaff, serviceId: string) => {
+    const current = staffObj.allowedServiceIds ?? [];
+    const updated = current.includes(serviceId)
+      ? current.filter(id => id !== serviceId)
+      : [...current, serviceId];
+    setEditStaff(prev => prev ? { ...prev, allowedServiceIds: updated } : null);
+  };
+
+  const toggleServiceForNew = (serviceId: string) => {
+    const current = newStaff.allowedServiceIds ?? [];
+    const updated = current.includes(serviceId)
+      ? current.filter(id => id !== serviceId)
+      : [...current, serviceId];
+    setNewStaff(p => ({ ...p, allowedServiceIds: updated }));
   };
 
   return (
@@ -85,6 +102,14 @@ export default function StaffPage() {
                       {s.positionAllowance > 0 && <span>加給 ${s.positionAllowance.toLocaleString()}</span>}
                     </div>
                     <div>帳號：{s.username}</div>
+                    <div className="mt-1">
+                      <span className="text-[#8a7a6e]">可執行服務：</span>
+                      <span className="text-[#1c1c1c]">
+                        {(s.allowedServiceIds ?? []).length > 0
+                          ? (s.allowedServiceIds ?? []).map(id => ADMIN_SERVICES.find(sv => sv.id === id)?.name).filter(Boolean).join("、")
+                          : "未設定"}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <button
@@ -188,6 +213,26 @@ export default function StaffPage() {
                   />
                 </div>
               )}
+              <div>
+                <label className="text-xs text-[#8a7a6e] mb-2 block">可執行服務</label>
+                <div className="space-y-1">
+                  {ADMIN_SERVICES.map(sv => {
+                    const allowed = (editStaff.allowedServiceIds ?? []).includes(sv.id);
+                    return (
+                      <label key={sv.id} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={allowed}
+                          onChange={() => toggleServiceForStaff(editStaff, sv.id)}
+                          className="rounded border-[#e8ddd2] accent-[#8b6748]"
+                        />
+                        <span className="text-xs text-[#1c1c1c]">{sv.name}</span>
+                        <span className="text-xs text-[#8a7a6e]">({sv.duration}分)</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
             <div className="flex gap-3 mt-4">
               <button onClick={() => setEditStaff(null)} className="flex-1 py-2.5 border border-[#e8ddd2] rounded-xl text-sm text-[#8a7a6e]">取消</button>
@@ -263,6 +308,26 @@ export default function StaffPage() {
                   className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
                 />
               )}
+              <div>
+                <label className="text-xs text-[#8a7a6e] mb-2 block">可執行服務</label>
+                <div className="space-y-1">
+                  {ADMIN_SERVICES.map(sv => {
+                    const allowed = (newStaff.allowedServiceIds ?? []).includes(sv.id);
+                    return (
+                      <label key={sv.id} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={allowed}
+                          onChange={() => toggleServiceForNew(sv.id)}
+                          className="rounded border-[#e8ddd2] accent-[#8b6748]"
+                        />
+                        <span className="text-xs text-[#1c1c1c]">{sv.name}</span>
+                        <span className="text-xs text-[#8a7a6e]">({sv.duration}分)</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
             <div className="flex gap-3 mt-4">
               <button onClick={() => setShowAddModal(false)} className="flex-1 py-2.5 border border-[#e8ddd2] rounded-xl text-sm text-[#8a7a6e]">取消</button>

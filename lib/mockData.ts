@@ -1,4 +1,4 @@
-export type StaffLevel = "技師職人" | "技術長";
+export type StaffLevel = "技師職人" | "技術長" | "準技師" | "實習技師";
 
 export interface Store {
   id: string;
@@ -20,17 +20,19 @@ export interface Teacher {
   bio: string;
   specialties: string[];
   yearsExp: number;
+  allowedServiceIds: string[]; // service IDs this teacher can perform
 }
 
 export interface Service {
   id: string;
   name: string;
   duration: number; // minutes
-  priceRegular: Record<StaffLevel, number>;
-  priceMember: Record<StaffLevel, number>;
+  priceRegular: Record<string, number>; // keyed by StaffLevel
+  priceMember: Record<string, number>;
   description: string;
   category: "fascia" | "training" | "addon";
   isAddon?: boolean;
+  onlineBookable: boolean; // whether shown in online booking
 }
 
 export interface TimeSlot {
@@ -71,49 +73,163 @@ export const stores: Store[] = [
 
 // ─── Teachers ──────────────────────────────────────────────────────────────
 export const teachers: Teacher[] = [
+  // ── 小巨蛋店 ──────────────────────────────
   {
-    id: "teacher1",
-    name: "陳雅婷",
+    id: "youtong",
+    name: "宥彤老師",
     level: "技術長",
-    storeIds: ["xiaoJudan", "daan"],
-    photoPlaceholder: "/placeholders/teacher1.jpg",
-    tagline: "專注深層筋膜結構調整，還原身體最自然的排列",
-    bio: "擁有超過10年的筋膜調理經驗，專精於結構整合與深層肌筋膜鬆解。曾赴日本、德國研修最新筋膜療法技術，以精準的觸感評估找出身體失衡根源。",
-    specialties: ["深層筋膜鬆解", "脊椎結構整合", "骨盆矯正"],
-    yearsExp: 10,
+    storeIds: ["xiaoJudan"],
+    photoPlaceholder: "",
+    tagline: "深層筋膜結構整合專家，還原身體最自然的排列",
+    bio: "技術長，擅長深層筋膜結構調整與頻率檢測評估。",
+    specialties: ["深層筋膜鬆解", "結構整合", "頻率檢測"],
+    yearsExp: 5,
+    allowedServiceIds: ["premium-120", "refined-90", "basic-60", "training-50", "frequency-40", "addon-20"],
   },
   {
-    id: "teacher2",
-    name: "林俊宏",
-    level: "技術長",
-    storeIds: ["daan"],
-    photoPlaceholder: "/placeholders/teacher2.jpg",
-    tagline: "運動傷害復原專家，協助您重拾身體的活動自由",
-    bio: "前職業運動員出身，深刻理解身體結構與運動表現的關聯。結合運動科學與筋膜調理，為各類運動傷害提供精準的恢復方案。",
-    specialties: ["運動傷害恢復", "姿勢矯正", "結構訓練"],
-    yearsExp: 8,
-  },
-  {
-    id: "teacher3",
-    name: "王思涵",
+    id: "jimbo",
+    name: "Jimbo老師",
     level: "技師職人",
     storeIds: ["xiaoJudan"],
-    photoPlaceholder: "/placeholders/teacher3.jpg",
-    tagline: "以溫柔而有力的手法，帶領您體驗筋膜鬆解的深度放鬆",
-    bio: "畢業於台灣體育運動大學，持有多項國際認證筋膜療法執照。擅長透過細膩的手法感知，逐步引導筋膜回到最佳狀態。",
-    specialties: ["全身筋膜調理", "頭頸部調整", "慢性疲勞舒緩"],
-    yearsExp: 5,
+    photoPlaceholder: "",
+    tagline: "以專業手法帶領您體驗筋膜放鬆的深度舒緩",
+    bio: "小巨蛋店店長，豐富的筋膜調理經驗。",
+    specialties: ["全身筋膜調理", "深層放鬆", "慢性疲勞舒緩"],
+    yearsExp: 4,
+    allowedServiceIds: ["premium-120", "refined-90", "basic-60", "addon-20"],
   },
   {
-    id: "teacher4",
-    name: "張美玲",
+    id: "hanhan",
+    name: "韓韓老師",
     level: "技師職人",
+    storeIds: ["xiaoJudan"],
+    photoPlaceholder: "",
+    tagline: "細膩感知，精準找出身體緊繃根源",
+    bio: "擅長全身筋膜評估與肩頸部位調理。",
+    specialties: ["肩頸調理", "全身筋膜評估", "放鬆舒緩"],
+    yearsExp: 3,
+    allowedServiceIds: ["premium-120", "refined-90", "basic-60", "addon-20"],
+  },
+  {
+    id: "shuoyuan",
+    name: "朔源老師",
+    level: "技師職人",
+    storeIds: ["xiaoJudan"],
+    photoPlaceholder: "",
+    tagline: "從根源調整，讓身體重回平衡",
+    bio: "專注於筋膜結構根源性調整。",
+    specialties: ["深層調整", "腰背部調理", "姿勢矯正"],
+    yearsExp: 3,
+    allowedServiceIds: ["premium-120", "refined-90", "basic-60", "addon-20"],
+  },
+  {
+    id: "daji",
+    name: "大吉老師",
+    level: "技師職人",
+    storeIds: ["xiaoJudan"],
+    photoPlaceholder: "",
+    tagline: "有力而穩定的手法，為您帶來深層放鬆",
+    bio: "擅長深層筋膜施壓與全身調理。",
+    specialties: ["深層施壓", "全身調理", "運動後恢復"],
+    yearsExp: 3,
+    allowedServiceIds: ["premium-120", "refined-90", "basic-60", "addon-20"],
+  },
+  {
+    id: "lily",
+    name: "Lily老師",
+    level: "準技師",
+    storeIds: ["xiaoJudan"],
+    photoPlaceholder: "",
+    tagline: "用心學習，全力為您提供舒適調理體驗",
+    bio: "準技師，持續精進筋膜調理技術。",
+    specialties: ["基礎筋膜放鬆", "全身調理"],
+    yearsExp: 1,
+    allowedServiceIds: ["basic-60", "addon-20"],
+  },
+  {
+    id: "jojo",
+    name: "Jojo老師",
+    level: "實習技師",
+    storeIds: ["xiaoJudan"],
+    photoPlaceholder: "",
+    tagline: "以學習的心，帶給您溫柔的調理體驗",
+    bio: "實習技師，在資深老師指導下進行調理。",
+    specialties: ["基礎筋膜放鬆"],
+    yearsExp: 0,
+    allowedServiceIds: ["basic-60"],
+  },
+  {
+    id: "r3",
+    name: "R3老師",
+    level: "實習技師",
+    storeIds: ["xiaoJudan"],
+    photoPlaceholder: "",
+    tagline: "認真學習每一個手法，為您帶來最好的體驗",
+    bio: "實習技師，在資深老師指導下進行調理。",
+    specialties: ["基礎筋膜放鬆"],
+    yearsExp: 0,
+    allowedServiceIds: ["basic-60"],
+  },
+  {
+    id: "yuchen",
+    name: "宇辰老師",
+    level: "技術長",
     storeIds: ["xiaoJudan", "daan"],
-    photoPlaceholder: "/placeholders/teacher4.jpg",
-    tagline: "讓每一次療程都成為您與身體深度對話的時刻",
-    bio: "專注於整體性筋膜評估與調理，相信身體具有自我修復的能力。透過系統性的筋膜鬆解，協助客戶建立對自身身體的全新認識。",
+    photoPlaceholder: "",
+    tagline: "FASCIA 法夏創辦人，筋膜結構美學的推動者",
+    bio: "創辦人，全館技術指導，專精於筋膜結構整合與功能式訓練。",
+    specialties: ["筋膜結構整合", "功能式訓練", "頻率檢測"],
+    yearsExp: 10,
+    allowedServiceIds: ["premium-120", "refined-90", "basic-60", "training-50", "frequency-40", "addon-20"],
+  },
+  // ── 大安店 ──────────────────────────────
+  {
+    id: "atai",
+    name: "阿鐵老師",
+    level: "技術長",
+    storeIds: ["daan"],
+    photoPlaceholder: "",
+    tagline: "運動科學結合筋膜療法，協助您重拾身體活動自由",
+    bio: "大安店技術長，專精於結構整合與功能式訓練。",
+    specialties: ["運動傷害恢復", "姿勢矯正", "功能式訓練"],
+    yearsExp: 8,
+    allowedServiceIds: ["premium-120", "refined-90", "basic-60", "training-50", "frequency-40", "addon-20"],
+  },
+  {
+    id: "miffy",
+    name: "Miffy老師",
+    level: "技師職人",
+    storeIds: ["daan"],
+    photoPlaceholder: "",
+    tagline: "溫柔而精準，讓每次調理都成為身心療癒的時刻",
+    bio: "大安店店長，豐富的筋膜調理與客戶服務經驗。",
+    specialties: ["全身筋膜調理", "頭頸部調整", "慢性疲勞"],
+    yearsExp: 5,
+    allowedServiceIds: ["premium-120", "refined-90", "basic-60", "addon-20"],
+  },
+  {
+    id: "cindy",
+    name: "Cindy老師",
+    level: "技師職人",
+    storeIds: ["daan"],
+    photoPlaceholder: "",
+    tagline: "系統性評估，找出您身體真正需要的調整",
+    bio: "擅長整體筋膜評估與腰背部調理。",
     specialties: ["整體筋膜評估", "腰背部調理", "壓力管理"],
-    yearsExp: 6,
+    yearsExp: 4,
+    allowedServiceIds: ["premium-120", "refined-90", "basic-60", "addon-20"],
+  },
+  {
+    id: "wenyi",
+    name: "雯儀老師",
+    level: "技師職人",
+    storeIds: ["daan"],
+    photoPlaceholder: "",
+    tagline: "細心聆聽身體的需求，給予最合適的調理",
+    bio: "擅長深層放鬆與姿勢改善調理。",
+    specialties: ["深層放鬆", "姿勢改善", "全身調理"],
+    yearsExp: 3,
+    allowedServiceIds: ["premium-120", "refined-90", "basic-60", "addon-20"],
   },
 ];
 
@@ -123,51 +239,62 @@ export const services: Service[] = [
     id: "premium-120",
     name: "頂級筋膜結構整合",
     duration: 120,
-    priceRegular: { "技師職人": 3800, "技術長": 4500 },
-    priceMember: { "技師職人": 3000, "技術長": 3800 },
-    description:
-      "完整的全身筋膜結構評估與深層整合療程。從足部到頭部系統性調整，適合長期姿勢問題或首次深度體驗。",
+    priceRegular: { "技師職人": 3800, "技術長": 4500, "準技師": 3000, "實習技師": 2500 },
+    priceMember:  { "技師職人": 3000, "技術長": 3800, "準技師": 2500, "實習技師": 2000 },
+    description: "完整的全身筋膜結構評估與深層整合療程。從足部到頭部系統性調整，適合長期姿勢問題或首次深度體驗。",
     category: "fascia",
+    onlineBookable: true,
   },
   {
     id: "refined-90",
     name: "精緻筋膜調理",
     duration: 90,
-    priceRegular: { "技師職人": 3200, "技術長": 3800 },
-    priceMember: { "技師職人": 2500, "技術長": 3200 },
-    description:
-      "針對特定部位進行深度筋膜鬆解，搭配全身淺層調理。適合有特定痠痛部位或定期保養需求。",
+    priceRegular: { "技師職人": 3200, "技術長": 3800, "準技師": 2500, "實習技師": 2000 },
+    priceMember:  { "技師職人": 2500, "技術長": 3200, "準技師": 2000, "實習技師": 1600 },
+    description: "針對特定部位進行深度筋膜鬆解，搭配全身淺層調理。適合有特定痠痛部位或定期保養需求。",
     category: "fascia",
+    onlineBookable: true,
   },
   {
-    id: "refined-60",
+    id: "basic-60",
     name: "基礎筋膜放鬆",
     duration: 60,
-    priceRegular: { "技師職人": 2500, "技術長": 3000 },
-    priceMember: { "技師職人": 2000, "技術長": 2500 },
-    description:
-      "聚焦單一重點部位的精準筋膜調理。忙碌現代人的快速保養首選，高效率釋放緊繃。",
+    priceRegular: { "技師職人": 2500, "技術長": 3000, "準技師": 2000, "實習技師": 1500 },
+    priceMember:  { "技師職人": 2000, "技術長": 2500, "準技師": 1600, "實習技師": 1200 },
+    description: "聚焦單一重點部位的精準筋膜調理。忙碌現代人的快速保養首選，高效率釋放緊繃。",
     category: "fascia",
+    onlineBookable: true,
   },
   {
     id: "training-50",
-    name: "一對一智能結構訓練",
+    name: "一對一功能式訓練",
     duration: 50,
-    priceRegular: { "技師職人": 2500, "技術長": 2500 },
-    priceMember: { "技師職人": 2500, "技術長": 2500 },
-    description:
-      "個人化結構矯正訓練課程，由技師帶領進行針對性的核心與姿勢訓練，鞏固筋膜調理成效。",
+    priceRegular: { "技師職人": 2500, "技術長": 2500, "準技師": 2500, "實習技師": 2500 },
+    priceMember:  { "技師職人": 2500, "技術長": 2500, "準技師": 2500, "實習技師": 2500 },
+    description: "個人化結構矯正訓練課程，由技師帶領進行針對性的核心與姿勢訓練，鞏固筋膜調理成效。",
     category: "training",
+    onlineBookable: true,
+  },
+  {
+    id: "frequency-40",
+    name: "頻率檢測",
+    duration: 40,
+    priceRegular: { "技師職人": 2500, "技術長": 2500, "準技師": 2500, "實習技師": 2500 },
+    priceMember:  { "技師職人": 2500, "技術長": 2500, "準技師": 2500, "實習技師": 2500 },
+    description: "專業頻率檢測評估，了解身體筋膜狀態。",
+    category: "fascia",
+    onlineBookable: false,
   },
   {
     id: "addon-20",
     name: "加購延長 +20分",
     duration: 20,
-    priceRegular: { "技師職人": 600, "技術長": 600 },
-    priceMember: { "技師職人": 600, "技術長": 600 },
+    priceRegular: { "技師職人": 600, "技術長": 600, "準技師": 600, "實習技師": 600 },
+    priceMember:  { "技師職人": 600, "技術長": 600, "準技師": 600, "實習技師": 600 },
     description: "於主療程後加購20分鐘，針對特別需要加強的部位深度處理。",
     category: "addon",
     isAddon: true,
+    onlineBookable: true,
   },
 ];
 

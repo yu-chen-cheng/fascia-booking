@@ -22,7 +22,7 @@ export interface MonthlyExpense {
   note?: string;
 }
 export type InternalLevel = "實習技師" | "準技師" | "初階老師" | "進階老師" | "資深老師" | "技術長";
-export type DisplayLevel = "技師職人" | "技術長";
+export type DisplayLevel = "技師職人" | "技術長" | "準技師" | "實習技師";
 export type MemberTier = "一般會員" | "黃金會員" | "白金會員";
 export type PaymentMethod = "現金" | "電子支付" | "轉帳" | "信用卡" | "儲值金";
 
@@ -42,6 +42,7 @@ export interface AdminStaff {
   commissionPerSession: number; // 每筆固定抽成金額
   positionAllowance: number;   // 每月職位加給（僱傭制才有）
   username: string;
+  allowedServiceIds: string[]; // which service IDs this staff can perform
 }
 
 export interface AdminService {
@@ -54,10 +55,17 @@ export interface AdminService {
   // 技術長定價
   priceSeniorRegular: number;
   priceSeniorMember: number;
+  // 準技師定價
+  priceJuniorRegular: number;
+  priceJuniorMember: number;
+  // 實習技師定價
+  priceInternRegular: number;
+  priceInternMember: number;
   // 特殊定價
   priceVendor: number;   // 特約廠商價
   priceFriend: number;   // 親友價
   enabled: boolean;
+  onlineBookable: boolean; // 是否開放網路預約
 }
 
 export interface AdminCustomer {
@@ -120,19 +128,30 @@ export const ADMIN_STORES: AdminStore[] = [
 ];
 
 export const ADMIN_STAFF: AdminStaff[] = [
-  { id: "S001", name: "王小明", internalLevel: "技術長", displayLevel: "技術長", storeId: "ST01", employmentType: "僱傭制", baseSalary: 45000, commissionPerSession: 1200, positionAllowance: 5000, username: "manager" },
-  { id: "S002", name: "陳美玲", internalLevel: "資深老師", displayLevel: "技師職人", storeId: "ST01", employmentType: "僱傭制", baseSalary: 35000, commissionPerSession: 900, positionAllowance: 3000, username: "staff1" },
-  { id: "S003", name: "林志偉", internalLevel: "進階老師", displayLevel: "技師職人", storeId: "ST02", employmentType: "承攬制", baseSalary: 0, commissionPerSession: 800, positionAllowance: 0, username: "staff2" },
-  { id: "S004", name: "黃雅琪", internalLevel: "初階老師", displayLevel: "技師職人", storeId: "ST02", employmentType: "承攬制", baseSalary: 0, commissionPerSession: 700, positionAllowance: 0, username: "staff3" },
-  { id: "S005", name: "張建宏", internalLevel: "準技師", displayLevel: "技師職人", storeId: "ST01", employmentType: "承攬制", baseSalary: 0, commissionPerSession: 500, positionAllowance: 0, username: "staff4" },
+  // 小巨蛋店
+  { id: "S001", name: "宥彤老師", internalLevel: "技術長", displayLevel: "技術長", storeId: "ST01", employmentType: "僱傭制", baseSalary: 45000, commissionPerSession: 1200, positionAllowance: 5000, username: "youtong", allowedServiceIds: ["SV01","SV02","SV03","SV04","SV05","SV06"] },
+  { id: "S002", name: "Jimbo老師", internalLevel: "進階老師", displayLevel: "技師職人", storeId: "ST01", employmentType: "承攬制", baseSalary: 0, commissionPerSession: 900, positionAllowance: 3000, username: "jimbo", allowedServiceIds: ["SV01","SV02","SV03","SV06"] },
+  { id: "S003", name: "韓韓老師", internalLevel: "進階老師", displayLevel: "技師職人", storeId: "ST01", employmentType: "承攬制", baseSalary: 0, commissionPerSession: 800, positionAllowance: 0, username: "hanhan", allowedServiceIds: ["SV01","SV02","SV03","SV06"] },
+  { id: "S004", name: "朔源老師", internalLevel: "進階老師", displayLevel: "技師職人", storeId: "ST01", employmentType: "承攬制", baseSalary: 0, commissionPerSession: 800, positionAllowance: 0, username: "shuoyuan", allowedServiceIds: ["SV01","SV02","SV03","SV06"] },
+  { id: "S005", name: "大吉老師", internalLevel: "進階老師", displayLevel: "技師職人", storeId: "ST01", employmentType: "承攬制", baseSalary: 0, commissionPerSession: 800, positionAllowance: 0, username: "daji", allowedServiceIds: ["SV01","SV02","SV03","SV06"] },
+  { id: "S006", name: "Lily老師", internalLevel: "準技師", displayLevel: "準技師", storeId: "ST01", employmentType: "承攬制", baseSalary: 0, commissionPerSession: 500, positionAllowance: 0, username: "lily", allowedServiceIds: ["SV01","SV06"] },
+  { id: "S007", name: "Jojo老師", internalLevel: "實習技師", displayLevel: "實習技師", storeId: "ST01", employmentType: "承攬制", baseSalary: 0, commissionPerSession: 300, positionAllowance: 0, username: "jojo", allowedServiceIds: ["SV01"] },
+  { id: "S008", name: "R3老師", internalLevel: "實習技師", displayLevel: "實習技師", storeId: "ST01", employmentType: "承攬制", baseSalary: 0, commissionPerSession: 300, positionAllowance: 0, username: "r3", allowedServiceIds: ["SV01"] },
+  { id: "S009", name: "宇辰老師", internalLevel: "技術長", displayLevel: "技術長", storeId: "ST01", employmentType: "僱傭制", baseSalary: 0, commissionPerSession: 0, positionAllowance: 0, username: "manager", allowedServiceIds: ["SV01","SV02","SV03","SV04","SV05","SV06"] },
+  // 大安店
+  { id: "S010", name: "阿鐵老師", internalLevel: "技術長", displayLevel: "技術長", storeId: "ST02", employmentType: "僱傭制", baseSalary: 45000, commissionPerSession: 1200, positionAllowance: 5000, username: "atai", allowedServiceIds: ["SV01","SV02","SV03","SV04","SV05","SV06"] },
+  { id: "S011", name: "Miffy老師", internalLevel: "進階老師", displayLevel: "技師職人", storeId: "ST02", employmentType: "承攬制", baseSalary: 0, commissionPerSession: 900, positionAllowance: 3000, username: "miffy", allowedServiceIds: ["SV01","SV02","SV03","SV06"] },
+  { id: "S012", name: "Cindy老師", internalLevel: "進階老師", displayLevel: "技師職人", storeId: "ST02", employmentType: "承攬制", baseSalary: 0, commissionPerSession: 800, positionAllowance: 0, username: "cindy", allowedServiceIds: ["SV01","SV02","SV03","SV06"] },
+  { id: "S013", name: "雯儀老師", internalLevel: "進階老師", displayLevel: "技師職人", storeId: "ST02", employmentType: "承攬制", baseSalary: 0, commissionPerSession: 800, positionAllowance: 0, username: "wenyi", allowedServiceIds: ["SV01","SV02","SV03","SV06"] },
 ];
 
 export const ADMIN_SERVICES: AdminService[] = [
-  { id: "SV01", name: "基礎筋膜調理", duration: 60, priceRegular: 2800, priceMember: 2500, priceSeniorRegular: 3200, priceSeniorMember: 2900, priceVendor: 2300, priceFriend: 2000, enabled: true },
-  { id: "SV02", name: "深層筋膜結構療程", duration: 90, priceRegular: 4200, priceMember: 3800, priceSeniorRegular: 4800, priceSeniorMember: 4300, priceVendor: 3600, priceFriend: 3200, enabled: true },
-  { id: "SV03", name: "全身筋膜舒壓", duration: 120, priceRegular: 5500, priceMember: 4900, priceSeniorRegular: 6200, priceSeniorMember: 5500, priceVendor: 4800, priceFriend: 4200, enabled: true },
-  { id: "SV04", name: "局部筋膜放鬆", duration: 50, priceRegular: 1800, priceMember: 1600, priceSeniorRegular: 2200, priceSeniorMember: 1900, priceVendor: 1500, priceFriend: 1300, enabled: true },
-  { id: "SV05", name: "頭頸肩筋膜調理", duration: 20, priceRegular: 1200, priceMember: 1000, priceSeniorRegular: 1400, priceSeniorMember: 1200, priceVendor: 1000, priceFriend: 800, enabled: false },
+  { id: "SV01", name: "基礎筋膜放鬆", duration: 60, priceRegular: 2500, priceMember: 2000, priceSeniorRegular: 3000, priceSeniorMember: 2500, priceJuniorRegular: 2000, priceJuniorMember: 1600, priceInternRegular: 1500, priceInternMember: 1200, priceVendor: 2000, priceFriend: 1500, enabled: true, onlineBookable: true },
+  { id: "SV02", name: "精緻筋膜調理", duration: 90, priceRegular: 3200, priceMember: 2500, priceSeniorRegular: 3800, priceSeniorMember: 3200, priceJuniorRegular: 2500, priceJuniorMember: 2000, priceInternRegular: 2000, priceInternMember: 1600, priceVendor: 2800, priceFriend: 2200, enabled: true, onlineBookable: true },
+  { id: "SV03", name: "頂級筋膜結構整合", duration: 120, priceRegular: 3800, priceMember: 3000, priceSeniorRegular: 4500, priceSeniorMember: 3800, priceJuniorRegular: 3000, priceJuniorMember: 2500, priceInternRegular: 2500, priceInternMember: 2000, priceVendor: 3500, priceFriend: 2800, enabled: true, onlineBookable: true },
+  { id: "SV04", name: "一對一功能式訓練", duration: 50, priceRegular: 2500, priceMember: 2500, priceSeniorRegular: 2500, priceSeniorMember: 2500, priceJuniorRegular: 2500, priceJuniorMember: 2500, priceInternRegular: 2500, priceInternMember: 2500, priceVendor: 2500, priceFriend: 2500, enabled: true, onlineBookable: true },
+  { id: "SV05", name: "頻率檢測", duration: 40, priceRegular: 2500, priceMember: 2500, priceSeniorRegular: 2500, priceSeniorMember: 2500, priceJuniorRegular: 2500, priceJuniorMember: 2500, priceInternRegular: 2500, priceInternMember: 2500, priceVendor: 2500, priceFriend: 2500, enabled: true, onlineBookable: false },
+  { id: "SV06", name: "加購延長 +20分", duration: 20, priceRegular: 600, priceMember: 600, priceSeniorRegular: 600, priceSeniorMember: 600, priceJuniorRegular: 600, priceJuniorMember: 600, priceInternRegular: 600, priceInternMember: 600, priceVendor: 600, priceFriend: 600, enabled: true, onlineBookable: true },
 ];
 
 export const ADMIN_CUSTOMERS: AdminCustomer[] = [

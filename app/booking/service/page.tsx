@@ -25,8 +25,15 @@ export default function ServicePage() {
   const showDiscount = isMember || isFirstTime;
   const level = state.selectedTeacher?.level || "技師職人";
 
-  const mainServices = services.filter((s) => !s.isAddon);
-  const addonService = services.find((s) => s.isAddon);
+  const teacher = state.selectedTeacher;
+  const mainServices = services.filter(
+    (s) => !s.isAddon && s.onlineBookable &&
+    (!teacher || teacher.allowedServiceIds.includes(s.id))
+  );
+  const addonService = services.find(
+    (s) => s.isAddon && s.onlineBookable &&
+    (!teacher || teacher.allowedServiceIds.includes(s.id))
+  );
 
   const getPrice = (service: Service) => {
     if (showDiscount) return service.priceMember[level];

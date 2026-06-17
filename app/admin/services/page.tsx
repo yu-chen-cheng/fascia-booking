@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAdmin } from "@/lib/adminContext";
-import { ADMIN_SERVICES, AdminService } from "@/lib/adminMockData";
+import { ADMIN_SERVICES, ADMIN_STAFF, AdminService } from "@/lib/adminMockData";
 import { useRouter } from "next/navigation";
 
 const DURATIONS = [20, 50, 60, 90, 120];
@@ -33,6 +33,10 @@ export default function ServicesPage() {
     setServices(prev => prev.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s));
   };
 
+  const toggleOnlineBookable = (id: string) => {
+    setServices(prev => prev.map(s => s.id === id ? { ...s, onlineBookable: !s.onlineBookable } : s));
+  };
+
   const startAddFlow = () => {
     setNewService({ duration: 60 });
     setPriceConfirm("");
@@ -48,7 +52,7 @@ export default function ServicesPage() {
     } else if (addStep === "duration") {
       setAddStep("price");
     } else if (addStep === "price") {
-      if (!newService.priceRegular || !newService.priceMember) return;
+      if (!newService.priceRegular || !newService.priceMember || !newService.priceJuniorRegular || !newService.priceInternRegular) return;
       setPriceConfirm("");
       setAddStep("confirm_price");
     } else if (addStep === "confirm_price") {
@@ -63,7 +67,7 @@ export default function ServicesPage() {
 
   const saveService = () => {
     const id = `SV${String(services.length + 1).padStart(2, "0")}`;
-    setServices(prev => [...prev, { ...newService, id, enabled: false } as AdminService]);
+    setServices(prev => [...prev, { ...newService, id, enabled: false, onlineBookable: newService.onlineBookable ?? true } as AdminService]);
     setShowAddFlow(false);
   };
 
@@ -104,27 +108,61 @@ export default function ServicesPage() {
                   }`}>
                     {s.enabled ? "啟用中" : "未啟用"}
                   </span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full border ${
+                    s.onlineBookable
+                      ? "bg-blue-50 text-blue-700 border-blue-200"
+                      : "bg-gray-100 text-gray-400 border-gray-200"
+                  }`}>
+                    {s.onlineBookable ? "開放網路預約" : "僅現場預約"}
+                  </span>
                 </div>
                 <div className="text-xs text-[#8a7a6e]">時長：{s.duration} 分鐘</div>
               </div>
-              <button
-                onClick={() => toggleEnabled(s.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs border transition-colors ${
-                  s.enabled
-                    ? "bg-gray-100 text-gray-600 border-gray-200"
-                    : "bg-[#8b6748] text-white border-[#8b6748]"
-                }`}
-              >
-                {s.enabled ? "停用" : "啟用"}
-              </button>
+              <div className="flex flex-col gap-1 items-end">
+                <button
+                  onClick={() => toggleEnabled(s.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs border transition-colors ${
+                    s.enabled
+                      ? "bg-gray-100 text-gray-600 border-gray-200"
+                      : "bg-[#8b6748] text-white border-[#8b6748]"
+                  }`}
+                >
+                  {s.enabled ? "停用" : "啟用"}
+                </button>
+                <button
+                  onClick={() => toggleOnlineBookable(s.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs border transition-colors ${
+                    s.onlineBookable
+                      ? "bg-blue-100 text-blue-700 border-blue-200"
+                      : "bg-gray-100 text-gray-500 border-gray-200"
+                  }`}
+                >
+                  {s.onlineBookable ? "關閉網路預約" : "開放網路預約"}
+                </button>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-[#8a7a6e] mt-2">
               <div>技師職人 一般：<span className="text-[#1c1c1c] font-medium">${s.priceRegular.toLocaleString()}</span></div>
               <div>技師職人 會員：<span className="text-[#8b6748] font-medium">${s.priceMember.toLocaleString()}</span></div>
               <div>技術長 一般：<span className="text-[#1c1c1c] font-medium">${s.priceSeniorRegular.toLocaleString()}</span></div>
               <div>技術長 會員：<span className="text-[#8b6748] font-medium">${s.priceSeniorMember.toLocaleString()}</span></div>
+              <div>準技師 一般：<span className="text-[#1c1c1c] font-medium">${s.priceJuniorRegular.toLocaleString()}</span></div>
+              <div>準技師 會員：<span className="text-[#8b6748] font-medium">${s.priceJuniorMember.toLocaleString()}</span></div>
+              <div>實習技師 一般：<span className="text-[#1c1c1c] font-medium">${s.priceInternRegular.toLocaleString()}</span></div>
+              <div>實習技師 會員：<span className="text-[#8b6748] font-medium">${s.priceInternMember.toLocaleString()}</span></div>
               <div>特約廠商：<span className="text-purple-600 font-medium">${s.priceVendor.toLocaleString()}</span></div>
               <div>親友價：<span className="text-blue-600 font-medium">${s.priceFriend.toLocaleString()}</span></div>
+            </div>
+            {/* 可執行老師 */}
+            <div className="mt-3 pt-3 border-t border-[#f0e8df]">
+              <div className="text-xs text-[#8a7a6e] mb-1">可執行老師</div>
+              <div className="flex flex-wrap gap-1">
+                {ADMIN_STAFF.filter(st => st.allowedServiceIds.includes(s.id)).map(st => (
+                  <span key={st.id} className="text-xs px-2 py-0.5 bg-[#faf7f2] text-[#8b6748] rounded-full border border-[#e8ddd2]">
+                    {st.name}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         ))}
@@ -179,11 +217,25 @@ export default function ServicesPage() {
             {addStep === "price" && (
               <div className="space-y-2">
                 <label className="text-sm font-medium text-[#1c1c1c] block">設定各級定價</label>
+                <div className="flex items-center justify-between py-2 px-3 bg-[#faf7f2] rounded-xl border border-[#e8ddd2]">
+                  <span className="text-xs text-[#8a7a6e]">開放網路預約</span>
+                  <button
+                    type="button"
+                    onClick={() => setNewService(p => ({ ...p, onlineBookable: !p.onlineBookable }))}
+                    className={`w-10 h-5 rounded-full transition-colors relative ${newService.onlineBookable ? "bg-blue-500" : "bg-gray-300"}`}
+                  >
+                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${newService.onlineBookable ? "translate-x-5" : "translate-x-0.5"}`} />
+                  </button>
+                </div>
                 {[
                   { label: "技師職人 一般價", field: "priceRegular" },
                   { label: "技師職人 會員價", field: "priceMember" },
                   { label: "技術長 一般價", field: "priceSeniorRegular" },
                   { label: "技術長 會員價", field: "priceSeniorMember" },
+                  { label: "準技師 一般價", field: "priceJuniorRegular" },
+                  { label: "準技師 會員價", field: "priceJuniorMember" },
+                  { label: "實習技師 一般價", field: "priceInternRegular" },
+                  { label: "實習技師 會員價", field: "priceInternMember" },
                   { label: "特約廠商價", field: "priceVendor" },
                   { label: "親友價", field: "priceFriend" },
                 ].map(({ label, field }) => (
@@ -248,12 +300,32 @@ export default function ServicesPage() {
                     <span className="text-[#8b6748]">${newService.priceSeniorMember?.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="text-[#8a7a6e]">準技師 一般</span>
+                    <span className="text-[#1c1c1c]">${newService.priceJuniorRegular?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#8a7a6e]">準技師 會員</span>
+                    <span className="text-[#8b6748]">${newService.priceJuniorMember?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#8a7a6e]">實習技師 一般</span>
+                    <span className="text-[#1c1c1c]">${newService.priceInternRegular?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#8a7a6e]">實習技師 會員</span>
+                    <span className="text-[#8b6748]">${newService.priceInternMember?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-[#8a7a6e]">特約廠商</span>
                     <span className="text-purple-600">${newService.priceVendor?.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[#8a7a6e]">親友價</span>
                     <span className="text-blue-600">${newService.priceFriend?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#8a7a6e]">網路預約</span>
+                    <span className={newService.onlineBookable ? "text-blue-600" : "text-gray-500"}>{newService.onlineBookable ? "開放" : "僅現場"}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[#8a7a6e]">狀態</span>
