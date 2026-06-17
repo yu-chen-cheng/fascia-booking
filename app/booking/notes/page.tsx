@@ -107,7 +107,7 @@ export default function NotesPage() {
       </div>
 
       {/* Bottom CTA */}
-      <div className="px-6 py-4 bg-[#fafaf8] border-t border-gray-100">
+      <div className="px-6 pt-4 bg-[#fafaf8] border-t border-gray-100" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
         <Button fullWidth size="lg" onClick={handleContinue}>
           下一步：確認預約內容
         </Button>

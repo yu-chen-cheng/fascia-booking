@@ -29,7 +29,9 @@ export default function DateTimePage() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(state.selectedDate);
   const [selectedTime, setSelectedTimeLocal] = useState<string | null>(state.selectedTime);
 
-  const duration = state.selectedService
+  const duration = state.selectedServices && state.selectedServices.length > 0
+    ? state.selectedServices.reduce((sum, s) => sum + s.duration, 0) + (state.hasAddon ? 20 : 0)
+    : state.selectedService
     ? state.selectedService.duration + (state.hasAddon ? 20 : 0)
     : 60;
 
@@ -43,14 +45,10 @@ export default function DateTimePage() {
     return d < t;
   };
 
-  const isMonday = (day: number) => {
-    return new Date(viewYear, viewMonth, day).getDay() === 1;
-  };
-
   const slots = selectedDay ? generateTimeSlots(selectedDay, duration) : [];
 
   const handleDaySelect = (day: number) => {
-    if (isPast(day) || isMonday(day)) return;
+    if (isPast(day)) return;
     const d = new Date(viewYear, viewMonth, day);
     setSelectedDay(d);
     setSelectedTimeLocal(null);
@@ -79,7 +77,7 @@ export default function DateTimePage() {
     <div className="flex flex-col min-h-screen">
       <BookingHeader
         title="選擇日期與時間"
-        subtitle={`療程時長：${duration} 分鐘`}
+        subtitle={`調理時長：${duration} 分鐘`}
         onBack={() => router.back()}
         step={7}
       />
@@ -107,7 +105,7 @@ export default function DateTimePage() {
           {/* Day headers */}
           <div className="grid grid-cols-7 mb-2">
             {DAYS_CN.map((d, i) => (
-              <div key={d} className={`text-center text-xs font-medium py-1 ${i === 0 ? "text-red-400" : i === 1 ? "text-gray-300" : "text-gray-400"}`}>
+              <div key={d} className={`text-center text-xs font-medium py-1 ${i === 0 ? "text-red-400" : "text-gray-400"}`}>
                 {d}
               </div>
             ))}
@@ -118,8 +116,7 @@ export default function DateTimePage() {
             {calDays.map((day, i) => {
               if (!day) return <div key={`empty-${i}`} />;
               const past = isPast(day);
-              const mon = isMonday(day);
-              const disabled = past || mon;
+              const disabled = past;
               const isSelected =
                 selectedDay &&
                 selectedDay.getDate() === day &&
@@ -147,15 +144,11 @@ export default function DateTimePage() {
                   {isToday && !isSelected && (
                     <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#b8956a]" />
                   )}
-                  {mon && !disabled && (
-                    <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] text-gray-300">休</span>
-                  )}
                 </button>
               );
             })}
           </div>
 
-          <p className="text-xs text-gray-400 text-center mt-3">每週一公休</p>
         </div>
 
         {/* Time slots */}
@@ -207,13 +200,13 @@ export default function DateTimePage() {
       </div>
 
       {/* Bottom CTA */}
-      <div className="px-6 py-4 bg-[#fafaf8] border-t border-gray-100">
+      <div className="px-6 pt-4 bg-[#fafaf8] border-t border-gray-100" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
         {selectedDay && selectedTime && (
           <div className="mb-3 p-3 bg-[#f5f0e8] rounded-xl">
             <p className="text-sm text-[#1a1a1a] font-medium">
               {formatDate(selectedDay)} {selectedTime}
             </p>
-            <p className="text-xs text-gray-500">療程時長 {duration} 分鐘</p>
+            <p className="text-xs text-gray-500">調理時長 {duration} 分鐘</p>
           </div>
         )}
         <Button

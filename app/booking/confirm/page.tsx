@@ -26,6 +26,7 @@ export default function ConfirmPage() {
     selectedStore,
     selectedTeacher,
     selectedService,
+    selectedServices,
     hasAddon,
     selectedDate,
     selectedTime,
@@ -42,8 +43,16 @@ export default function ConfirmPage() {
     ? `${selectedDate.getFullYear()}年${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日（${DAYS_CN[selectedDate.getDay()]}）`
     : "—";
 
+  const servicesToShow = selectedServices && selectedServices.length > 0
+    ? selectedServices
+    : selectedService
+    ? [selectedService]
+    : [];
+
   const durationTotal =
-    (selectedService?.duration || 0) + (hasAddon ? 20 : 0);
+    (servicesToShow.length > 0
+      ? servicesToShow.reduce((sum, s) => sum + s.duration, 0)
+      : 0) + (hasAddon ? 20 : 0);
 
   const handleConfirm = () => {
     router.push("/booking/success");
@@ -66,8 +75,8 @@ export default function ConfirmPage() {
           </h3>
           <Row label="門市" value={selectedStore?.name || "—"} />
           <Row label="技師" value={selectedTeacher ? `${selectedTeacher.name} ${selectedTeacher.level}` : "—"} />
-          <Row label="服務" value={selectedService ? `${selectedService.name}${hasAddon ? " + 加購20分" : ""}` : "—"} />
-          <Row label="療程時長" value={`${durationTotal} 分鐘`} />
+          <Row label="服務" value={servicesToShow.length > 0 ? `${servicesToShow.map(s => s.name).join("、")}${hasAddon ? " + 加購20分" : ""}` : "—"} />
+          <Row label="調理時長" value={`${durationTotal} 分鐘`} />
           <Row label="日期" value={dateStr} />
           <Row label="時間" value={selectedTime ? `${selectedTime} 起` : "—"} />
           {notes && <Row label="備註" value={notes} />}
@@ -78,17 +87,19 @@ export default function ConfirmPage() {
           <h3 className="text-xs tracking-[0.15em] text-[#b8956a] uppercase font-medium mb-3">
             費用明細
           </h3>
-          {selectedService && selectedTeacher && (
+          {servicesToShow.length > 0 && selectedTeacher && (
             <>
-              <div className="flex justify-between items-center py-2">
-                <span className="text-sm text-gray-500">{selectedService.name}</span>
-                <span className="text-sm font-medium">
-                  ${(showDiscount
-                    ? selectedService.priceMember[selectedTeacher.level]
-                    : selectedService.priceRegular[selectedTeacher.level]
-                  ).toLocaleString()}
-                </span>
-              </div>
+              {servicesToShow.map((svc) => (
+                <div key={svc.id} className="flex justify-between items-center py-2">
+                  <span className="text-sm text-gray-500">{svc.name}</span>
+                  <span className="text-sm font-medium">
+                    ${(showDiscount
+                      ? svc.priceMember[selectedTeacher.level]
+                      : svc.priceRegular[selectedTeacher.level]
+                    ).toLocaleString()}
+                  </span>
+                </div>
+              ))}
               {hasAddon && (
                 <div className="flex justify-between items-center py-2">
                   <span className="text-sm text-gray-500">加購 +20分</span>
@@ -122,13 +133,13 @@ export default function ConfirmPage() {
         {/* Edit reminder */}
         <div className="bg-[#f5f0e8] rounded-xl p-4">
           <p className="text-xs text-gray-500 leading-relaxed">
-            確認預約後，系統將透過 LINE 傳送確認通知。如需更改或取消，請於療程前24小時前聯繫我們。
+            確認後，系統將透過 LINE 傳送確認通知。如需更改或取消，請於調理前24小時前聯繫我們。
           </p>
         </div>
       </div>
 
       {/* Bottom CTA */}
-      <div className="px-6 py-4 bg-[#fafaf8] border-t border-gray-100 space-y-2">
+      <div className="px-6 pt-4 bg-[#fafaf8] border-t border-gray-100 space-y-2" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
         <Button fullWidth size="lg" onClick={handleConfirm}>
           確認預約
         </Button>

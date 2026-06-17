@@ -13,9 +13,14 @@ export default function StorePage() {
   const { state, setSelectedStore } = useBooking();
   const [selected, setSelected] = useState<Store | null>(state.selectedStore);
   const [mapOpen, setMapOpen] = useState<string | null>(null);
+  const [shaking, setShaking] = useState(false);
 
   const handleContinue = () => {
-    if (!selected) return;
+    if (!selected) {
+      setShaking(true);
+      setTimeout(() => setShaking(false), 500);
+      return;
+    }
     setSelectedStore(selected);
     router.push("/booking/teacher");
   };
@@ -23,6 +28,15 @@ export default function StorePage() {
   const availableStores = stores.filter((s) => !s.comingSoon);
 
   return (
+    <>
+    <style>{`
+      @keyframes shake {
+        0%,100% { transform: translateX(0); }
+        25% { transform: translateX(-6px); }
+        75% { transform: translateX(6px); }
+      }
+      .shake { animation: shake 0.4s ease; }
+    `}</style>
     <div className="flex flex-col min-h-screen">
       <BookingHeader
         title="選擇門市"
@@ -126,11 +140,14 @@ export default function StorePage() {
       </div>
 
       {/* Bottom CTA */}
-      <div className="px-6 py-4 bg-[#fafaf8] border-t border-gray-100">
-        <Button fullWidth size="lg" onClick={handleContinue} disabled={!selected}>
-          {selected ? `確認選擇 ${selected.name}` : "請選擇門市"}
-        </Button>
+      <div className="px-6 pt-4 bg-[#fafaf8] border-t border-gray-100" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+        <div className={shaking ? "shake" : ""}>
+          <Button fullWidth size="lg" onClick={handleContinue} disabled={!selected}>
+            {selected ? `確認選擇 ${selected.name}` : "請選擇門市"}
+          </Button>
+        </div>
       </div>
     </div>
+    </>
   );
 }

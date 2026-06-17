@@ -17,18 +17,32 @@ export default function TeacherPage() {
   const { state, setSelectedTeacher } = useBooking();
   const [selected, setSelected] = useState<Teacher | null>(state.selectedTeacher);
   const [bioOpen, setBioOpen] = useState<string | null>(null);
+  const [shaking, setShaking] = useState(false);
 
   const storeTeachers = teachers.filter(
     (t) => !state.selectedStore || t.storeIds.includes(state.selectedStore.id)
   );
 
   const handleContinue = () => {
-    if (!selected) return;
+    if (!selected) {
+      setShaking(true);
+      setTimeout(() => setShaking(false), 500);
+      return;
+    }
     setSelectedTeacher(selected);
     router.push("/booking/service");
   };
 
   return (
+    <>
+    <style>{`
+      @keyframes shake {
+        0%,100% { transform: translateX(0); }
+        25% { transform: translateX(-6px); }
+        75% { transform: translateX(6px); }
+      }
+      .shake { animation: shake 0.4s ease; }
+    `}</style>
     <div className="flex flex-col min-h-screen">
       <BookingHeader
         title="選擇技師"
@@ -158,11 +172,14 @@ export default function TeacherPage() {
       )}
 
       {/* Bottom CTA */}
-      <div className="px-6 py-4 bg-[#fafaf8] border-t border-gray-100">
-        <Button fullWidth size="lg" onClick={handleContinue} disabled={!selected}>
-          {selected ? `確認選擇 ${selected.name}` : "請選擇技師"}
-        </Button>
+      <div className="px-6 pt-4 bg-[#fafaf8] border-t border-gray-100" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+        <div className={shaking ? "shake" : ""}>
+          <Button fullWidth size="lg" onClick={handleContinue} disabled={!selected}>
+            {selected ? `確認選擇 ${selected.name}` : "請選擇技師"}
+          </Button>
+        </div>
       </div>
     </div>
+    </>
   );
 }

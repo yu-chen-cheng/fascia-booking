@@ -164,46 +164,51 @@ export default function RegisterPage() {
               出生年月日 <span className="text-[#b8956a]">*</span>
             </label>
             <div className="grid grid-cols-3 gap-3">
-              <input
-                type="number"
-                placeholder="年（例：1990）"
+              <select
                 value={form.year}
                 onChange={(e) => {
                   setForm((f) => ({ ...f, year: e.target.value }));
                   setErrors((e_) => ({ ...e_, birthday: "" }));
                 }}
-                className={`px-3 py-3.5 rounded-xl border text-base text-center outline-none transition-colors ${
+                className={`px-3 py-3.5 rounded-xl border text-base text-center outline-none transition-colors appearance-none ${
                   errors.birthday ? "border-red-400 bg-red-50" : "border-gray-200 bg-white focus:border-[#b8956a]"
                 }`}
-              />
-              <input
-                type="number"
-                placeholder="月"
-                min="1"
-                max="12"
+              >
+                <option value="">年</option>
+                {Array.from({ length: new Date().getFullYear() - 1949 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+                  <option key={y} value={String(y)}>{y}</option>
+                ))}
+              </select>
+              <select
                 value={form.month}
                 onChange={(e) => {
                   setForm((f) => ({ ...f, month: e.target.value }));
                   setErrors((e_) => ({ ...e_, birthday: "" }));
                 }}
-                className={`px-3 py-3.5 rounded-xl border text-base text-center outline-none transition-colors ${
+                className={`px-3 py-3.5 rounded-xl border text-base text-center outline-none transition-colors appearance-none ${
                   errors.birthday ? "border-red-400 bg-red-50" : "border-gray-200 bg-white focus:border-[#b8956a]"
                 }`}
-              />
-              <input
-                type="number"
-                placeholder="日"
-                min="1"
-                max="31"
+              >
+                <option value="">月</option>
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                  <option key={m} value={String(m)}>{m}</option>
+                ))}
+              </select>
+              <select
                 value={form.day}
                 onChange={(e) => {
                   setForm((f) => ({ ...f, day: e.target.value }));
                   setErrors((e_) => ({ ...e_, birthday: "" }));
                 }}
-                className={`px-3 py-3.5 rounded-xl border text-base text-center outline-none transition-colors ${
+                className={`px-3 py-3.5 rounded-xl border text-base text-center outline-none transition-colors appearance-none ${
                   errors.birthday ? "border-red-400 bg-red-50" : "border-gray-200 bg-white focus:border-[#b8956a]"
                 }`}
-              />
+              >
+                <option value="">日</option>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                  <option key={d} value={String(d)}>{d}</option>
+                ))}
+              </select>
             </div>
             {errors.birthday && (
               <p className="text-red-500 text-xs mt-1">{errors.birthday}</p>
@@ -220,7 +225,7 @@ export default function RegisterPage() {
       </div>
 
       {/* Bottom CTA */}
-      <div className="px-6 py-4 bg-[#fafaf8] border-t border-gray-100">
+      <div className="px-6 pt-4 bg-[#fafaf8] border-t border-gray-100" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
         <Button fullWidth size="lg" onClick={handleSubmit}>
           下一步：閱讀同意書
         </Button>

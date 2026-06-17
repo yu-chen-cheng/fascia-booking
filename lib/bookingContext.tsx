@@ -14,6 +14,7 @@ export interface BookingState {
   selectedStore: Store | null;
   selectedTeacher: Teacher | null;
   selectedService: Service | null;
+  selectedServices: Service[];
   hasAddon: boolean;
   selectedDate: Date | null;
   selectedTime: string | null;
@@ -31,6 +32,7 @@ interface BookingContextType {
   setSelectedStore: (store: Store | null) => void;
   setSelectedTeacher: (teacher: Teacher | null) => void;
   setSelectedService: (service: Service | null) => void;
+  setSelectedServices: (services: Service[]) => void;
   setHasAddon: (val: boolean) => void;
   setSelectedDate: (date: Date | null) => void;
   setSelectedTime: (time: string | null) => void;
@@ -48,6 +50,7 @@ const initialState: BookingState = {
   selectedStore: null,
   selectedTeacher: null,
   selectedService: null,
+  selectedServices: [],
   hasAddon: false,
   selectedDate: null,
   selectedTime: null,
@@ -64,17 +67,27 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, ...partial }));
 
   const getTotalPrice = () => {
-    if (!state.selectedService || !state.selectedTeacher) return 0;
+    if (!state.selectedTeacher) return 0;
     const isMember = state.user?.isMember || false;
     const isFirstTime = state.user?.isNewUser || false;
     const level = state.selectedTeacher.level;
 
-    let price = isMember || isFirstTime
-      ? state.selectedService.priceMember[level]
-      : state.selectedService.priceRegular[level];
+    const servicesToSum = state.selectedServices.length > 0
+      ? state.selectedServices
+      : state.selectedService
+      ? [state.selectedService]
+      : [];
+
+    if (servicesToSum.length === 0) return 0;
+
+    let price = servicesToSum.reduce((sum, svc) => {
+      return sum + (isMember || isFirstTime
+        ? svc.priceMember[level]
+        : svc.priceRegular[level]);
+    }, 0);
 
     if (state.hasAddon) {
-      price += 600; // addon is always +600
+      price += 600;
     }
     return price;
   };
@@ -89,6 +102,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         setSelectedStore: (selectedStore) => update({ selectedStore }),
         setSelectedTeacher: (selectedTeacher) => update({ selectedTeacher }),
         setSelectedService: (selectedService) => update({ selectedService }),
+        setSelectedServices: (selectedServices) => update({ selectedServices }),
         setHasAddon: (hasAddon) => update({ hasAddon }),
         setSelectedDate: (selectedDate) => update({ selectedDate }),
         setSelectedTime: (selectedTime) => update({ selectedTime }),
