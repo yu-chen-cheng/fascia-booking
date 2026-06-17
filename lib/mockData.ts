@@ -14,6 +14,7 @@ export interface Teacher {
   id: string;
   name: string;
   level: StaffLevel;
+  gender: "male" | "female";
   storeIds: string[];
   photoPlaceholder: string;
   tagline: string;
@@ -21,6 +22,7 @@ export interface Teacher {
   specialties: string[];
   yearsExp: number;
   allowedServiceIds: string[]; // service IDs this teacher can perform
+  staffOnly?: boolean; // hidden from regular client booking flow
 }
 
 export interface Service {
@@ -78,6 +80,7 @@ export const teachers: Teacher[] = [
     id: "youtong",
     name: "宥彤老師",
     level: "技術長",
+    gender: "female",
     storeIds: ["xiaoJudan"],
     photoPlaceholder: "",
     tagline: "深層筋膜結構整合專家，還原身體最自然的排列",
@@ -90,6 +93,7 @@ export const teachers: Teacher[] = [
     id: "jimbo",
     name: "Jimbo老師",
     level: "技師職人",
+    gender: "female",
     storeIds: ["xiaoJudan"],
     photoPlaceholder: "",
     tagline: "以專業手法帶領您體驗筋膜放鬆的深度舒緩",
@@ -102,6 +106,7 @@ export const teachers: Teacher[] = [
     id: "hanhan",
     name: "韓韓老師",
     level: "技師職人",
+    gender: "female",
     storeIds: ["xiaoJudan"],
     photoPlaceholder: "",
     tagline: "細膩感知，精準找出身體緊繃根源",
@@ -114,6 +119,7 @@ export const teachers: Teacher[] = [
     id: "shuoyuan",
     name: "朔源老師",
     level: "技師職人",
+    gender: "male",
     storeIds: ["xiaoJudan"],
     photoPlaceholder: "",
     tagline: "從根源調整，讓身體重回平衡",
@@ -126,6 +132,7 @@ export const teachers: Teacher[] = [
     id: "daji",
     name: "大吉老師",
     level: "技師職人",
+    gender: "male",
     storeIds: ["xiaoJudan"],
     photoPlaceholder: "",
     tagline: "有力而穩定的手法，為您帶來深層放鬆",
@@ -138,6 +145,7 @@ export const teachers: Teacher[] = [
     id: "lily",
     name: "Lily老師",
     level: "準技師",
+    gender: "female",
     storeIds: ["xiaoJudan"],
     photoPlaceholder: "",
     tagline: "用心學習，全力為您提供舒適調理體驗",
@@ -150,6 +158,7 @@ export const teachers: Teacher[] = [
     id: "jojo",
     name: "Jojo老師",
     level: "實習技師",
+    gender: "female",
     storeIds: ["xiaoJudan"],
     photoPlaceholder: "",
     tagline: "以學習的心，帶給您溫柔的調理體驗",
@@ -162,6 +171,7 @@ export const teachers: Teacher[] = [
     id: "r3",
     name: "R3老師",
     level: "實習技師",
+    gender: "male",
     storeIds: ["xiaoJudan"],
     photoPlaceholder: "",
     tagline: "認真學習每一個手法，為您帶來最好的體驗",
@@ -170,23 +180,12 @@ export const teachers: Teacher[] = [
     yearsExp: 0,
     allowedServiceIds: ["basic-60"],
   },
-  {
-    id: "yuchen",
-    name: "宇辰老師",
-    level: "技術長",
-    storeIds: ["xiaoJudan", "daan"],
-    photoPlaceholder: "",
-    tagline: "FASCIA 法夏創辦人，筋膜結構美學的推動者",
-    bio: "創辦人，全館技術指導，專精於筋膜結構整合與功能式訓練。",
-    specialties: ["筋膜結構整合", "功能式訓練", "頻率檢測"],
-    yearsExp: 10,
-    allowedServiceIds: ["premium-120", "refined-90", "basic-60", "training-50", "frequency-40", "addon-20"],
-  },
   // ── 大安店 ──────────────────────────────
   {
     id: "atai",
     name: "阿鐵老師",
     level: "技術長",
+    gender: "male",
     storeIds: ["daan"],
     photoPlaceholder: "",
     tagline: "運動科學結合筋膜療法，協助您重拾身體活動自由",
@@ -199,6 +198,7 @@ export const teachers: Teacher[] = [
     id: "miffy",
     name: "Miffy老師",
     level: "技師職人",
+    gender: "female",
     storeIds: ["daan"],
     photoPlaceholder: "",
     tagline: "溫柔而精準，讓每次調理都成為身心療癒的時刻",
@@ -211,6 +211,7 @@ export const teachers: Teacher[] = [
     id: "cindy",
     name: "Cindy老師",
     level: "技師職人",
+    gender: "female",
     storeIds: ["daan"],
     photoPlaceholder: "",
     tagline: "系統性評估，找出您身體真正需要的調整",
@@ -223,6 +224,7 @@ export const teachers: Teacher[] = [
     id: "wenyi",
     name: "雯儀老師",
     level: "技師職人",
+    gender: "female",
     storeIds: ["daan"],
     photoPlaceholder: "",
     tagline: "細心聆聽身體的需求，給予最合適的調理",
@@ -230,6 +232,21 @@ export const teachers: Teacher[] = [
     specialties: ["深層放鬆", "姿勢改善", "全身調理"],
     yearsExp: 3,
     allowedServiceIds: ["premium-120", "refined-90", "basic-60", "addon-20"],
+  },
+  // ── 僅限內部使用（staffOnly）──────────────
+  {
+    id: "yuchen",
+    name: "宇辰老師",
+    level: "技術長",
+    gender: "male",
+    storeIds: ["xiaoJudan", "daan"],
+    photoPlaceholder: "",
+    tagline: "FASCIA 法夏創辦人，筋膜結構美學的推動者",
+    bio: "創辦人，全館技術指導，專精於筋膜結構整合與功能式訓練。",
+    specialties: ["筋膜結構整合", "功能式訓練", "頻率檢測"],
+    yearsExp: 10,
+    allowedServiceIds: ["premium-120", "refined-90", "basic-60", "training-50", "frequency-40", "addon-20"],
+    staffOnly: true,
   },
 ];
 
