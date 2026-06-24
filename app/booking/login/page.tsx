@@ -50,7 +50,6 @@ export default function LoginPage() {
       }
     };
     window.addEventListener("beforeinstallprompt", handleBeforeInstall);
-    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
 
     if (!isLocal) {
       // Try to silently initialise LIFF and redirect if already logged in
@@ -66,6 +65,8 @@ export default function LoginPage() {
         }
       })();
     }
+
+    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
