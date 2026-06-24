@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useBooking } from "@/lib/bookingContext";
 import BookingHeader from "@/components/BookingHeader";
 import Button from "@/components/ui/Button";
+import { getCustomerByLineId, createBooking } from "@/lib/customerApi";
 
 const DAYS_CN = ["日", "一", "二", "三", "四", "五", "六"];
 
@@ -23,8 +24,11 @@ export default function ConfirmPage() {
   const router = useRouter();
   const { state, getTotalPrice, setNotes } = useBooking();
   const [notesOpen, setNotesOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [noteTags, setNoteTags] = useState<string[]>([]);
   const [localNotes, setLocalNotes] = useState(state.notes || "");
+  const [selectedVoucher, setSelectedVoucher] = useState<string | null>(null);
+  const [voucherOpen, setVoucherOpen] = useState(false);
 
   const toggleNote = (s: string) => {
     const next = noteTags.includes(s) ? noteTags.filter(x => x !== s) : [...noteTags, s];
@@ -48,6 +52,14 @@ export default function ConfirmPage() {
   const isFirstTime = user?.isNewUser || false;
   const showDiscount = isMember || isFirstTime;
   const totalPrice = getTotalPrice();
+  const voucherDiscount = selectedVoucher ? parseVoucherAmount(selectedVoucher) : 0;
+  const finalPrice = Math.max(0, totalPrice - voucherDiscount);
+
+  function parseVoucherAmount(voucher: string): number {
+    const match = voucher.match(/\$([0-9,]+)/);
+    if (!match) return 0;
+    return parseInt(match[1].replace(",", ""), 10);
+  }
 
   const dateStr = selectedDate
     ? `${selectedDate.getFullYear()}年${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日（${DAYS_CN[selectedDate.getDay()]}）`
@@ -64,8 +76,32 @@ export default function ConfirmPage() {
       ? servicesToShow.reduce((sum, s) => sum + s.duration, 0)
       : 0) + (hasAddon ? 20 : 0);
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     setNotes(localNotes);
+    setSubmitting(true);
+
+    // 寫入 Supabase
+    if (user && selectedStore && selectedTeacher && selectedDate && selectedTime) {
+      const customer = await getCustomerByLineId(user.id);
+      if (customer) {
+        const serviceId = servicesToShow[0]?.id ?? "";
+        const addonId = hasAddon ? "addon-20" : undefined;
+        const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`;
+        await createBooking({
+          customerId: customer.id,
+          storeId: selectedStore.id,
+          serviceId,
+          staffId: selectedTeacher.id,
+          date: dateStr,
+          timeSlot: selectedTime,
+          notes: localNotes || undefined,
+          addonId,
+          totalPrice: finalPrice,
+        });
+      }
+    }
+
+    setSubmitting(false);
     router.push("/booking/success");
   };
 
@@ -124,9 +160,15 @@ export default function ConfirmPage() {
                   </p>
                 </div>
               )}
+              {voucherDiscount > 0 && (
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-sm text-amber-700">折價券</span>
+                  <span className="text-sm font-medium text-amber-700">-${voucherDiscount.toLocaleString()}</span>
+                </div>
+              )}
               <div className="border-t border-gray-100 mt-2 pt-3 flex justify-between items-center">
                 <span className="text-base font-semibold text-[#1a1a1a]">總計</span>
-                <span className="text-xl font-bold text-[#b8956a]">${totalPrice.toLocaleString()}</span>
+                <span className="text-xl font-bold text-[#b8956a]">${finalPrice.toLocaleString()}</span>
               </div>
             </>
           )}
@@ -140,6 +182,34 @@ export default function ConfirmPage() {
           <Row label="姓名" value={user?.name || "—"} />
           <Row label="手機" value={user?.phone || "—"} />
         </div>
+
+        {/* Voucher section */}
+        {user?.vouchers && user.vouchers.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
+            <button
+              onClick={() => setVoucherOpen(o => !o)}
+              className="w-full flex items-center justify-between px-5 py-4"
+            >
+              <span className="text-xs tracking-[0.15em] text-[#b8956a] uppercase font-medium">使用折價券（選填）</span>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#b8956a" strokeWidth="1.5" style={{ transform: voucherOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            {voucherOpen && (
+              <div className="px-5 pb-5 space-y-2">
+                {user.vouchers.map(v => (
+                  <button
+                    key={v}
+                    onClick={() => setSelectedVoucher(selectedVoucher === v ? null : v)}
+                    className={`w-full px-4 py-3 rounded-xl border text-left text-sm transition-colors ${selectedVoucher === v ? "bg-[#8b6748]/5 border-[#8b6748] text-[#8b6748] font-medium" : "bg-[#faf7f2] border-[#e8ddd2] text-[#1c1c1c]"}`}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Optional notes */}
         <div className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 overflow-hidden">
@@ -173,6 +243,36 @@ export default function ConfirmPage() {
           )}
         </div>
 
+        {/* Member tier progress */}
+        {(() => {
+          const spent = user?.totalSpent ?? 0;
+          const afterThis = spent + totalPrice;
+          const TIERS = [
+            { threshold: 15000, label: "法夏會員", color: "bg-[#8b6748]" },
+            { threshold: 30000, label: "黃金會員", color: "bg-amber-500" },
+            { threshold: 50000, label: "白金會員", color: "bg-slate-500" },
+          ];
+          const nextTier = TIERS.find(t => afterThis < t.threshold);
+          if (!nextTier) return null;
+          const prevThreshold = TIERS[TIERS.indexOf(nextTier) - 1]?.threshold ?? 0;
+          const gap = nextTier.threshold - prevThreshold;
+          const progress = Math.min(100, Math.round(((afterThis - prevThreshold) / gap) * 100));
+          const remaining = nextTier.threshold - afterThis;
+          return (
+            <div className="bg-white rounded-2xl p-4 shadow-sm ring-1 ring-[#e8ddd2]">
+              <p className="text-xs tracking-[0.12em] text-[#b8956a] uppercase font-medium mb-2">會員升級進度</p>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-[#1a1a1a]">距離解鎖 {nextTier.label}</span>
+                <span className="text-sm font-semibold text-[#8b6748]">還差 ${remaining.toLocaleString()}</span>
+              </div>
+              <div className="h-2.5 bg-[#f5f0e8] rounded-full overflow-hidden">
+                <div className={`h-full ${nextTier.color} rounded-full transition-all`} style={{ width: `${progress}%` }} />
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">累積消費 ${afterThis.toLocaleString()}／目標 ${nextTier.threshold.toLocaleString()}</p>
+            </div>
+          );
+        })()}
+
         {/* Edit reminder */}
         <div className="bg-[#f5f0e8] rounded-xl p-4">
           <p className="text-xs text-gray-500 leading-relaxed">
@@ -183,8 +283,8 @@ export default function ConfirmPage() {
 
       {/* Bottom CTA */}
       <div className="px-6 pt-4 bg-[#fafaf8] border-t border-gray-100 space-y-2" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
-        <Button fullWidth size="lg" onClick={handleConfirm}>
-          確認預約
+        <Button fullWidth size="lg" onClick={handleConfirm} disabled={submitting}>
+          {submitting ? "送出中..." : "確認預約"}
         </Button>
         <button
           onClick={() => router.push("/booking/store")}

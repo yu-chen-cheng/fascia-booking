@@ -20,6 +20,7 @@ export default function ExpensesPage() {
   const router = useRouter();
   const [expenses, setExpenses] = useState<MonthlyExpense[]>(MONTHLY_EXPENSES);
   const [month, setMonth] = useState("2026-06");
+  const [filterStoreId, setFilterStoreId] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [newExpense, setNewExpense] = useState<Partial<MonthlyExpense>>({
     category: "耗材", storeId: "ST01", amount: 0,
@@ -35,11 +36,19 @@ export default function ExpensesPage() {
     );
   }
 
-  const monthExpenses = expenses.filter(e => e.month === month);
+  const monthExpenses = expenses.filter(e =>
+    e.month === month && (filterStoreId === "" || e.storeId === filterStoreId || e.storeId === "all")
+  );
   const unconfirmed = monthExpenses.filter(e => !e.confirmed);
 
+  // Compute effective amount for an expense given current store filter
+  const effectiveAmount = (e: MonthlyExpense) => {
+    if (e.storeId === "all" && filterStoreId !== "") return Math.round(e.amount / 2);
+    return e.amount;
+  };
+
   // Calculate salary for each staff based on completed bookings this month
-  const staffSalaries = ADMIN_STAFF.map(s => {
+  const allStaffSalaries = ADMIN_STAFF.map(s => {
     const completedThisMonth = ADMIN_BOOKINGS.filter(
       b => b.staffId === s.id && b.status === "已完成" && b.date.startsWith(month)
     );
@@ -48,18 +57,23 @@ export default function ExpensesPage() {
     const storeName = ADMIN_STORES.find(st => st.id === s.storeId)?.name || "";
 
     if (s.employmentType === "僱傭制") {
-      // 底薪 + 抽成 + 職位加給
-      const total = s.baseSalary + commissionTotal + s.positionAllowance;
-      return { ...s, sessionCount, commissionTotal, totalSalary: total, storeName };
+      const bonusEligible = sessionCount >= 40;
+      const commissionBonusTotal = bonusEligible ? commissionTotal : 0;
+      const total = s.baseSalary + commissionBonusTotal + s.positionAllowance;
+      return { ...s, sessionCount, commissionTotal: commissionBonusTotal, totalSalary: total, storeName, bonusEligible };
     } else {
-      // 承攬制：只有抽成，無底薪
-      return { ...s, sessionCount, commissionTotal, totalSalary: commissionTotal, storeName };
+      return { ...s, sessionCount, commissionTotal, totalSalary: commissionTotal, storeName, bonusEligible: undefined };
     }
   });
+
+  const staffSalaries = filterStoreId
+    ? allStaffSalaries.filter(s => s.storeId === filterStoreId)
+    : allStaffSalaries;
+
   const totalSalaryExpense = staffSalaries.reduce((s, st) => s + st.totalSalary, 0);
 
-  const totalExpense = monthExpenses.reduce((s, e) => s + e.amount, 0) + totalSalaryExpense;
-  const confirmedTotal = monthExpenses.filter(e => e.confirmed).reduce((s, e) => s + e.amount, 0);
+  const totalExpense = monthExpenses.reduce((s, e) => s + effectiveAmount(e), 0) + totalSalaryExpense;
+  const confirmedTotal = monthExpenses.filter(e => e.confirmed).reduce((s, e) => s + effectiveAmount(e), 0);
 
   const confirmAll = () => {
     setExpenses(prev => prev.map(e =>
@@ -105,14 +119,22 @@ export default function ExpensesPage() {
         </button>
       </div>
 
-      {/* Month selector */}
-      <div className="flex gap-2 mb-4 items-center">
+      {/* Month selector + store filter */}
+      <div className="flex gap-2 mb-4 items-center flex-wrap">
         <input
           type="month"
           value={month}
           onChange={e => setMonth(e.target.value)}
           className="px-3 py-2 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
         />
+        <select
+          value={filterStoreId}
+          onChange={e => setFilterStoreId(e.target.value)}
+          className="px-3 py-2 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
+        >
+          <option value="">全部分店</option>
+          {ADMIN_STORES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
       </div>
 
       {/* 防呆警示 */}
@@ -148,7 +170,7 @@ export default function ExpensesPage() {
         <div className="bg-white rounded-2xl border border-[#e8ddd2] p-4">
           <div className="text-xs text-[#8a7a6e] mb-1">本月總支出（含薪水）</div>
           <div className="text-2xl font-semibold text-red-600">${totalExpense.toLocaleString()}</div>
-          <div className="text-xs text-[#8a7a6e] mt-1">薪水費 ${totalSalaryExpense.toLocaleString()} + 其他 ${monthExpenses.reduce((s,e)=>s+e.amount,0).toLocaleString()}</div>
+          <div className="text-xs text-[#8a7a6e] mt-1">薪水費 ${totalSalaryExpense.toLocaleString()} + 其他 ${monthExpenses.reduce((s,e)=>s+effectiveAmount(e),0).toLocaleString()}</div>
         </div>
         <div className="bg-white rounded-2xl border border-[#e8ddd2] p-4">
           <div className="text-xs text-[#8a7a6e] mb-1">固定費用確認狀況</div>
@@ -180,7 +202,12 @@ export default function ExpensesPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-[#1c1c1c]">${e.amount.toLocaleString()}</span>
+                  <div className="text-right">
+                    <span className="text-sm font-medium text-[#1c1c1c]">${effectiveAmount(e).toLocaleString()}</span>
+                    {e.storeId === "all" && filterStoreId !== "" && (
+                      <div className="text-xs text-[#8a7a6e]">全館分攤 ÷2</div>
+                    )}
+                  </div>
                   {e.confirmed ? (
                     <span className="text-xs text-green-600 font-medium">✓ 已確認</span>
                   ) : (
@@ -227,6 +254,9 @@ export default function ExpensesPage() {
                   <span>抽成（{s.sessionCount} 筆 × ${s.commissionPerSession.toLocaleString()}）</span>
                   <span>${s.commissionTotal.toLocaleString()}</span>
                 </div>
+                {s.employmentType === "僱傭制" && s.bonusEligible === false && (
+                  <div className="text-amber-600 text-[11px]">未達40人次門檻，無獎金（本月 {s.sessionCount} 人次）</div>
+                )}
                 {s.positionAllowance > 0 && (
                   <div className="flex justify-between">
                     <span>職位加給</span><span>${s.positionAllowance.toLocaleString()}</span>
@@ -257,7 +287,12 @@ export default function ExpensesPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-[#1c1c1c]">${e.amount.toLocaleString()}</span>
+                  <div className="text-right">
+                    <span className="text-sm font-medium text-[#1c1c1c]">${effectiveAmount(e).toLocaleString()}</span>
+                    {e.storeId === "all" && filterStoreId !== "" && (
+                      <div className="text-xs text-[#8a7a6e]">全館分攤 ÷2</div>
+                    )}
+                  </div>
                   {e.confirmed ? (
                     <span className="text-xs text-green-600 font-medium">✓</span>
                   ) : (
@@ -319,6 +354,11 @@ export default function ExpensesPage() {
                   <option value="all">全館</option>
                   {ADMIN_STORES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
+                {newExpense.storeId === "all" && (
+                  <div className="mt-1 text-xs text-blue-600">
+                    費用將平均分攤至各分店{newExpense.amount && newExpense.amount > 0 ? `（每家 $${Math.round(newExpense.amount / 2).toLocaleString()}）` : ""}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-xs text-[#8a7a6e] mb-1 block">金額</label>

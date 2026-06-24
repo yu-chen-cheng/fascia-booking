@@ -28,7 +28,14 @@ export default function SuccessPage() {
     return () => clearTimeout(t);
   }, []);
 
-  const { selectedStore, selectedTeacher, selectedServices, selectedService, selectedDate, selectedTime, hasAddon, notes } = state;
+  const { selectedStore, selectedTeacher, selectedServices, selectedService, selectedDate, selectedTime, hasAddon, notes, user } = state;
+
+  const visitCount = (user?.bookingHistory?.length ?? 0) + 1;
+  const milestone =
+    visitCount === 3 ? { num: 3, msg: "您已完成第 3 次調理，身體正在建立新的平衡模式 ✦" } :
+    visitCount === 10 ? { num: 10, msg: "第 10 次調理里程碑！您的筋膜已走過一段深度修復的旅程 ✦" } :
+    visitCount === 20 ? { num: 20, msg: "第 20 次！您已成為真正了解自己身體的人 ✦" } :
+    null;
 
   const displayServices = selectedServices && selectedServices.length > 0
     ? selectedServices
@@ -120,6 +127,14 @@ export default function SuccessPage() {
             </div>
           </div>
         </div>
+
+        {/* Milestone card */}
+        {milestone && (
+          <div className="w-full max-w-sm mt-4 bg-gradient-to-br from-[#8b6748] to-[#b8956a] rounded-2xl px-5 py-4 shadow-md">
+            <p className="text-[10px] tracking-[0.2em] text-[#d4b896] uppercase font-medium mb-1">調理里程碑</p>
+            <p className="text-sm text-white leading-relaxed">{milestone.msg}</p>
+          </div>
+        )}
 
         {/* Post-care */}
         <div className="w-full max-w-sm mt-4 bg-white rounded-2xl px-5 py-4 border border-[#e8ddd2]">

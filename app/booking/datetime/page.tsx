@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useBooking } from "@/lib/bookingContext";
 import { generateTimeSlots } from "@/lib/mockData";
+import { STAFF_EVENTS, ADMIN_STAFF } from "@/lib/adminMockData";
 import BookingHeader from "@/components/BookingHeader";
 
 const DAYS_CN = ["日", "一", "二", "三", "四", "五", "六"];
@@ -44,7 +45,19 @@ export default function DateTimePage() {
     return d < t;
   };
 
-  const slots = selectedDay ? generateTimeSlots(selectedDay, duration) : [];
+  // Get blocked periods for the selected teacher on the selected day
+  const blockedPeriods = selectedDay && state.selectedTeacher
+    ? (() => {
+        const adminStaff = ADMIN_STAFF.find(s => s.name === state.selectedTeacher!.name);
+        if (!adminStaff) return [];
+        const dayStr = selectedDay.toISOString().split("T")[0];
+        return STAFF_EVENTS
+          .filter(e => e.staffId === adminStaff.id && e.date === dayStr)
+          .map(e => ({ startTime: e.startTime, endTime: e.endTime }));
+      })()
+    : [];
+
+  const slots = selectedDay ? generateTimeSlots(selectedDay, duration, blockedPeriods) : [];
 
   const handleDaySelect = (day: number) => {
     if (isPast(day)) return;

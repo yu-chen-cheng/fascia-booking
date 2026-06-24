@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAdmin } from "@/lib/adminContext";
-import { ADMIN_SERVICES, ADMIN_STAFF, AdminService } from "@/lib/adminMockData";
+import { ADMIN_SERVICES, ADMIN_STAFF, ADMIN_STORES, AdminService } from "@/lib/adminMockData";
 import { useRouter } from "next/navigation";
 
 const DURATIONS = [20, 50, 60, 90, 120];
@@ -18,6 +18,7 @@ export default function ServicesPage() {
   const [newService, setNewService] = useState<Partial<AdminService>>({ duration: 60 });
   const [priceConfirm, setPriceConfirm] = useState("");
   const [priceError, setPriceError] = useState(false);
+  const [selectedStore, setSelectedStore] = useState("");
 
   if (!user) return null;
   if (user.role !== "管理者") {
@@ -79,9 +80,11 @@ export default function ServicesPage() {
     preview: "步驟 5/5：預覽確認",
   };
 
+  const storeTabs = [{ id: "", name: "全部" }, ...ADMIN_STORES];
+
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl font-semibold text-[#1c1c1c]">服務項目</h1>
           <p className="text-sm text-[#8a7a6e] mt-1">共 {services.length} 項服務</p>
@@ -92,6 +95,23 @@ export default function ServicesPage() {
         >
           + 新增服務
         </button>
+      </div>
+
+      {/* Store filter tabs */}
+      <div className="flex gap-2 mb-5">
+        {storeTabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setSelectedStore(tab.id)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors border ${
+              selectedStore === tab.id
+                ? "bg-[#8b6748] text-white border-[#8b6748]"
+                : "bg-white text-[#8a7a6e] border-[#e8ddd2]"
+            }`}
+          >
+            {tab.name}
+          </button>
+        ))}
       </div>
 
       <div className="space-y-3">
@@ -155,13 +175,23 @@ export default function ServicesPage() {
             </div>
             {/* 可執行老師 */}
             <div className="mt-3 pt-3 border-t border-[#f0e8df]">
-              <div className="text-xs text-[#8a7a6e] mb-1">可執行老師</div>
+              <div className="text-xs text-[#8a7a6e] mb-1">
+                可執行老師
+                {selectedStore !== "" && (
+                  <span className="ml-1 text-[#8b6748]">
+                    （{ADMIN_STORES.find(st => st.id === selectedStore)?.name}）
+                  </span>
+                )}
+              </div>
               <div className="flex flex-wrap gap-1">
-                {ADMIN_STAFF.filter(st => st.allowedServiceIds.includes(s.id)).map(st => (
+                {ADMIN_STAFF.filter(st => st.allowedServiceIds.includes(s.id) && (selectedStore === "" || st.storeId === selectedStore)).map(st => (
                   <span key={st.id} className="text-xs px-2 py-0.5 bg-[#faf7f2] text-[#8b6748] rounded-full border border-[#e8ddd2]">
                     {st.name}
                   </span>
                 ))}
+                {ADMIN_STAFF.filter(st => st.allowedServiceIds.includes(s.id) && (selectedStore === "" || st.storeId === selectedStore)).length === 0 && (
+                  <span className="text-xs text-[#c0b5ac]">此門市尚無可執行老師</span>
+                )}
               </div>
             </div>
           </div>

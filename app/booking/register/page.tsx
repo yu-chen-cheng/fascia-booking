@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useBooking } from "@/lib/bookingContext";
 import BookingHeader from "@/components/BookingHeader";
 import Button from "@/components/ui/Button";
+import { upsertCustomer } from "@/lib/customerApi";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -40,14 +41,28 @@ export default function RegisterPage() {
     return errs;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const errs = validate();
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
       return;
     }
 
-    // Persist registration data to localStorage
+    const birthday = `${form.year}-${form.month.padStart(2, "0")}-${form.day.padStart(2, "0")}`;
+
+    // 寫入 Supabase（upsert：已有則更新）
+    if (lineUserId) {
+      await upsertCustomer({
+        lineUserId,
+        name: form.name,
+        phone: form.phone,
+        email: form.email || undefined,
+        birthday,
+        consentSigned: false,
+      });
+    }
+
+    // 本地快取
     localStorage.setItem("fascia_user_name", form.name);
     localStorage.setItem("fascia_user_phone", form.phone);
     localStorage.setItem("fascia_registration_done", "true");
@@ -57,7 +72,7 @@ export default function RegisterPage() {
       name: form.name,
       phone: form.phone,
       email: form.email || "",
-      birthday: `${form.year}-${form.month.padStart(2, "0")}-${form.day.padStart(2, "0")}`,
+      birthday,
       isNewUser: true,
       isMember: false,
       storedValue: 0,

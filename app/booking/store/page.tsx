@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useBooking } from "@/lib/bookingContext";
 import { stores, Store } from "@/lib/mockData";
@@ -15,6 +15,15 @@ export default function StorePage() {
   const [shaking, setShaking] = useState(false);
 
   const availableStores = stores.filter((s) => !s.comingSoon);
+
+  // Birthday banner: check if current month matches user birthday month
+  const isBirthdayMonth = useMemo(() => {
+    const birthday = state.user?.birthday;
+    if (!birthday) return false;
+    const todayMonth = new Date().getMonth() + 1;
+    const birthMonth = parseInt(birthday.split("-")[1], 10);
+    return todayMonth === birthMonth;
+  }, [state.user?.birthday]);
 
   return (
     <>
@@ -35,6 +44,49 @@ export default function StorePage() {
       />
 
       <div className="flex-1 px-6 py-6 space-y-4">
+        {/* Birthday banner */}
+        {isBirthdayMonth && (
+          <div className="bg-gradient-to-r from-[#b8956a] to-[#d4b896] rounded-2xl px-5 py-4 text-white shadow-md shadow-[#b8956a]/25">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🎂</span>
+              <div>
+                <p className="text-sm font-semibold">生日快樂，{state.user?.name?.split(" ")[0] || "親愛的會員"}！</p>
+                <p className="text-xs text-white/80 mt-0.5">本月預約享專屬生日優惠，歡迎預約時告知技師</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Quick access */}
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => router.push("/booking/history")}
+            className="bg-white rounded-2xl px-4 py-3.5 ring-1 ring-gray-100 shadow-sm text-left hover:shadow-md transition-shadow active:scale-[0.97]"
+          >
+            <div className="w-8 h-8 rounded-lg bg-[#f5f0e8] flex items-center justify-center mb-2">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#b8956a" strokeWidth="1.5">
+                <path d="M8 2a6 6 0 100 12A6 6 0 008 2z" />
+                <path d="M8 5v3l2 2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <p className="text-xs font-semibold text-[#1a1a1a]">調理紀錄</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">查看歷次調理</p>
+          </button>
+          <button
+            onClick={() => router.push("/booking/products")}
+            className="bg-white rounded-2xl px-4 py-3.5 ring-1 ring-gray-100 shadow-sm text-left hover:shadow-md transition-shadow active:scale-[0.97]"
+          >
+            <div className="w-8 h-8 rounded-lg bg-[#f5f0e8] flex items-center justify-center mb-2">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#b8956a" strokeWidth="1.5">
+                <path d="M2 3h12l-1.5 7H3.5L2 3z" strokeLinejoin="round" />
+                <circle cx="5.5" cy="12.5" r="1" />
+                <circle cx="10.5" cy="12.5" r="1" />
+              </svg>
+            </div>
+            <p className="text-xs font-semibold text-[#1a1a1a]">法夏嚴選</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">居家保養推薦</p>
+          </button>
+        </div>
         {availableStores.map((store) => (
           <div key={store.id}>
             <Card
@@ -114,20 +166,6 @@ export default function StorePage() {
           </div>
         ))}
 
-        {/* Coming soon */}
-        <Card className="opacity-50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="8" cy="8" r="6.5" strokeDasharray="2 2" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-gray-400">板橋店</h3>
-              <p className="text-sm text-gray-400">即將開幕，敬請期待</p>
-            </div>
-          </div>
-        </Card>
       </div>
 
     </div>

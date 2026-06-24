@@ -10,6 +10,7 @@ import {
   liffLogin,
   getLiffProfile,
 } from "@/lib/liff";
+import { getCustomerByLineId } from "@/lib/customerApi";
 
 const LIFF_URL = `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID}`;
 
@@ -80,18 +81,20 @@ export default function LoginPage() {
       localStorage.getItem("fascia_registration_done") === "true";
 
     if (previouslyRegistered) {
-      const savedName = localStorage.getItem("fascia_user_name") || profile.displayName;
-      const savedPhone = localStorage.getItem("fascia_user_phone") || "";
+      // 優先從 Supabase 讀取最新資料
+      const customer = await getCustomerByLineId(profile.userId);
+      const name = customer?.name || localStorage.getItem("fascia_user_name") || profile.displayName;
+      const phone = customer?.phone || localStorage.getItem("fascia_user_phone") || "";
       setUser({
         id: profile.userId,
-        name: savedName,
-        phone: savedPhone,
-        email: "",
-        birthday: "",
+        name,
+        phone,
+        email: customer?.email || "",
+        birthday: customer?.birthday || "",
         isNewUser: false,
-        isMember: false,
-        storedValue: 0,
-        totalSpent: 0,
+        isMember: (customer?.membership_level !== "general"),
+        storedValue: customer?.stored_value ?? 0,
+        totalSpent: customer?.total_spent ?? 0,
         consentSigned: true,
         vouchers: [],
         bookingHistory: [],
@@ -134,13 +137,13 @@ export default function LoginPage() {
         name: "Allen 測試",
         phone: "0912345678",
         email: "",
-        birthday: "1990-01-01",
+        birthday: "1990-06-15",
         isNewUser: false,
         isMember: false,
         storedValue: 0,
         totalSpent: 0,
         consentSigned: true,
-        vouchers: [],
+        vouchers: ["首次儲值優惠券 $500"],
         bookingHistory: [],
       });
       setConsentSigned(true);
@@ -175,10 +178,11 @@ export default function LoginPage() {
           </h3>
           <div className="space-y-2">
             {[
-              "首次預約享會員優惠價格",
-              "儲值 $15,000 解鎖長期會員優惠",
+              "首次預約即享會員優惠價",
+              "儲值或累積消費滿 $15,000，自動升級長期會員優惠",
+              "累積滿 $30,000 贈送結構訓練一堂；滿 $50,000 贈送頻率檢測",
               "LINE 即時預約確認通知",
-              "專屬療程記錄管理",
+              "專屬調理紀錄與身體狀態追蹤",
             ].map((benefit) => (
               <div key={benefit} className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-[#b8956a] flex-shrink-0" />

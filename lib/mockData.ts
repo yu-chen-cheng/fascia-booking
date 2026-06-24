@@ -8,11 +8,14 @@ export interface Store {
   phone: string;
   hours: string;
   comingSoon?: boolean;
+  openDate?: string;
 }
 
 export interface Teacher {
   id: string;
   name: string;
+  avatarText: string; // text shown in the colored circle
+  subtitle?: string; // optional extra title shown below level badge (e.g. 店長)
   level: StaffLevel;
   gender: "male" | "female";
   storeIds: string[];
@@ -66,11 +69,11 @@ export const stores: Store[] = [
   {
     id: "banqiao",
     name: "板橋店",
-    address: "新北市板橋區（即將開幕）",
+    address: "新北市板橋區仁化街27號1樓",
     mapEmbedUrl: "",
     phone: "",
-    hours: "",
-    comingSoon: true,
+    hours: "每週一至週日 10:00–22:00",
+    openDate: "2026-07-15",
   },
 ];
 
@@ -80,13 +83,14 @@ export const teachers: Teacher[] = [
   {
     id: "youtong",
     name: "宥彤老師",
+    avatarText: "宥彤",
     level: "技術長",
     gender: "female",
     storeIds: ["xiaoJudan"],
     photoPlaceholder: "",
-    tagline: "國考合格物理治療師，從根源改善痠痛、預防慢性傷害",
-    bio: "我是國考合格的物理治療師，曾任台北市立聯合醫院陽明院區的實習治療師，在物理治療領域已深耕超過九年。\n\n我的理念是：結合專業的徒手治療與動作訓練，從源頭改善痠痛、提升動作表現，並預防慢性傷害，讓身體回到自然又有效率的狀態！",
-    specialties: ["物理治療", "動態神經穩定", "足部核心", "徒手治療"],
+    tagline: "高考物理治療師，深耕九年，曾多次出國義診的調理職人",
+    bio: "我是國考合格的物理治療師，在身體調理這條路上已走了超過九年。除了在醫療院所累積紮實的臨床經驗，我也多次自費出國參與義診，走進不同文化與環境裡，用雙手幫助真正需要的人。\n\n那些義診的經歷讓我明白：語言不通也沒關係，身體的語言是共通的。感受得到緊繃、找得到根源、解決問題——這是我一直在做、也會持續做的事。\n\n我的理念是從源頭改善，而不是壓制症狀。來找我，我們一起讓你的身體回到它本來的狀態。",
+    specialties: ["動作評估", "筋膜手法", "解剖列車", "羅夫按摩", "軟組織放鬆", "筋膜結構評估", "動態神經穩定", "足部核心"],
     certifications: [
       "DNS 動態神經穩定術 國際認證（Basic A/B）",
       "Petr 布拉格內臟肌骨療法 國際認證",
@@ -103,13 +107,15 @@ export const teachers: Teacher[] = [
   {
     id: "jimbo",
     name: "Jimbo老師",
+    avatarText: "Jimbo",
+    subtitle: "店長",
     level: "技師職人",
     gender: "female",
     storeIds: ["xiaoJudan"],
     photoPlaceholder: "",
-    tagline: "劇場與服務業的細膩感知，轉化為對身體最專注的陪伴",
-    bio: "從事服務業與劇場工作10年左右，長期透過排練與演出培養出對身體細膩的感知，與專注當下的力量，透過服務業長期與人接觸，使我能細膩感受他人的狀態變化，並依其當下需求調整服務方式。\n\n現今從事身體調理工作，結合運動經驗與身體覺察，透過雙手評估與調整身體狀態，協助身體逐步放鬆、恢復平衡與穩定。\n\n期待以專業與細心的服務，陪伴你更靠近自己的身體。",
-    specialties: ["解剖列車", "筋膜手法", "身體覺察", "整體評估"],
+    tagline: "劇場人、十年創業老闆，用舞台磨出來的敏感度讀懂你的身體",
+    bio: "我有兩段很不一樣的過去：一段在舞台上，一段在吧檯後。\n\n劇場訓練我的感知——怎麼讀空間、讀情緒、讀一個人此刻的狀態。十年飲料店創業訓練我的韌性——怎麼在每天面對各式各樣的人時，還能保持細心與熱情。\n\n這兩件事加在一起，讓我做調理的方式有點不一樣：我不是只按照你說的位置去做，而是在你進門的那一刻就開始讀你——站姿、眼神、說話的方式，都在告訴我你的身體今天需要什麼。",
+    specialties: ["動作評估", "筋膜手法", "解剖列車", "羅夫按摩", "軟組織放鬆", "身體覺察", "整體評估"],
     certifications: [
       "解剖列車（Anatomy Trains）徒手應用",
       "義大利筋膜手法（FM）徒手應用",
@@ -122,13 +128,14 @@ export const teachers: Teacher[] = [
   {
     id: "hanhan",
     name: "韓韓老師",
+    avatarText: "韓韓",
     level: "技師職人",
     gender: "female",
     storeIds: ["xiaoJudan"],
     photoPlaceholder: "",
-    tagline: "每一次調理都是與身體的對話，傾聽、陪伴、找回平衡",
-    bio: "一路走來，我在不同的研習與實務經驗中不斷累積，持續流動、持續改變。\n\n在服務的過程中，我發現每一個身體都有它獨特的語言，提醒我：沒有唯一的方法，只有適合當下的方式。因此，我珍惜每一次的調理，把它當作與身體的對話：傾聽、陪伴，並一起找到平衡。\n\n這些經驗帶給我的收穫，總比我想像得更多。過去的摸索，讓我更期待未來的探索。",
-    specialties: ["解剖列車", "筋膜手法", "拮抗鬆弛術", "整體評估"],
+    tagline: "知名導演旗下剪接師、旅居海外、英語流利，用剪接師的眼光看懂你的身體",
+    bio: "我做過知名導演旗下的電影剪接師，所有的畫面都是我一格一格看過、一刀一刀剪出來的。\n\n剪接這份工作教我一件事：細節決定一切。同樣一個場景，動作差0.5秒、角度差一點，給人的感覺就完全不同。這種對細微差異的敏感度，後來全部轉移到我的雙手上。\n\n在海外打工的經驗讓我的英語很流利，也讓我習慣和不同背景的人相處。調理時我喜歡細細觀察——哪個方向的張力更緊、哪個細節被忽略了——就像剪接一樣，找到那個「差一點」，把它調回來。",
+    specialties: ["動作評估", "筋膜手法", "解剖列車", "羅夫按摩", "軟組織放鬆", "拮抗鬆弛術", "整體評估"],
     certifications: [
       "解剖列車（Anatomy Trains）徒手應用",
       "義大利筋膜手法（FM）徒手應用",
@@ -143,13 +150,14 @@ export const teachers: Teacher[] = [
   {
     id: "shuoyuan",
     name: "溯源老師",
+    avatarText: "溯源",
     level: "技師職人",
     gender: "male",
-    storeIds: ["xiaoJudan"],
+    storeIds: ["banqiao"],
     photoPlaceholder: "",
-    tagline: "以如水的溫柔與韌性，引導您連結生命的源頭能量",
-    bio: "自行創業當老闆，多年的餐飲工作，讓我深刻理解長年勞損與痠痛的糾纏，也因此更懂得「健康」的可貴。\n\n我以如水般的溫柔與韌性，化解身體的緊繃，更以真誠的心，引導您連結生命的源頭能量。\n\n如今我踏入了健康產業，帶著無比堅定的信念，走上筋膜調理的道路。在法夏，我希望能藉由調理，帶給您不只肌肉的放鬆，更是內在的勇氣與平靜。讓我們一起，以帥氣、開心的姿態，迎向每一天！",
-    specialties: ["解剖列車", "筋膜手法", "整體評估", "能量平衡"],
+    tagline: "創業家、溯溪人，豪邁熱情，用真誠的雙手找到你的源頭",
+    bio: "我是自己當老闆的人，靠著一份豬血糕事業打下一片天；空閒時，你會在溪谷裡找到我——多年溯溪經驗，讓我習慣在最艱難的地形裡，一步一步找到上游的源頭。\n\n朋友說我有點像張飛：個性豪邁、熱情直爽，跟誰都能聊得起來。也正因為這樣，當你躺上床說「這裡痠、那裡緊」，我會用最直接的方式回應你——不廢話、不拐彎，找到根源就動手解決。\n\n走入筋膜調理這條路，我帶著溯溪時的那股韌勁——不繞路、不妥協，帶著滿腔熱情陪你一起把身體找回來。",
+    specialties: ["動作評估", "筋膜手法", "解剖列車", "羅夫按摩", "軟組織放鬆", "身體結構平衡", "整體評估"],
     certifications: [
       "系統性身體功能評估（SFMA）概念研習",
       "解剖列車（Anatomy Trains）徒手應用",
@@ -161,13 +169,14 @@ export const teachers: Teacher[] = [
   {
     id: "daji",
     name: "大吉老師",
+    avatarText: "大吉",
     level: "技師職人",
     gender: "male",
     storeIds: ["xiaoJudan"],
     photoPlaceholder: "",
-    tagline: "對人的狀態敏銳感知，從源頭導正讓身體找回平衡順暢",
-    bio: "從精緻餐旅服務到高壓的公共事務，過往的工作經驗讓我變成對「人的狀態」非常敏銳。現在，我把這份敏銳度用在你的身心上。\n\n擁有三年以上的徒手調理經驗，不間斷地學習相關知識與手法，透過筋膜張力與動作評估，循線索發現問題來源，並從源頭導正，指導需要強化的肌群。\n\n我喜愛幫助人恢復身體功能、重拾笑顏，讓我們一起讓離家出走的平衡與順暢重新回到你的身體。",
-    specialties: ["解剖列車", "筋膜手法", "動作評估", "體適能訓練"],
+    tagline: "精緻飯店出身、精通外語、帶著三年徒手底子加入法夏",
+    bio: "我在高端飯店待過多年，精通多國語言，習慣用最高標準服務來自世界各地的客人——細節不能錯、狀態要能隨時切換、對每個人的需求要夠敏銳。\n\n加入法夏之前，我已經在徒手調理這條路走了三年。不是半路出家，而是帶著真實的實戰經驗來的。\n\n外語能力讓我能服務更多元的客群，飯店訓練出的細膩讓我做每一個手法都不將就，而三年的調理底子，讓我從第一天來到法夏就知道自己在做什麼。你值得被這樣的人認真對待。",
+    specialties: ["動作評估", "筋膜手法", "解剖列車", "羅夫按摩", "軟組織放鬆", "體適能訓練", "整體評估"],
     certifications: [
       "系統性身體功能評估（SFMA）概念研習",
       "解剖列車（Anatomy Trains）徒手應用",
@@ -180,13 +189,14 @@ export const teachers: Teacher[] = [
   {
     id: "lily",
     name: "Lily老師",
+    avatarText: "Lily",
     level: "準技師",
     gender: "female",
-    storeIds: ["xiaoJudan"],
+    storeIds: ["banqiao"],
     photoPlaceholder: "",
-    tagline: "用心學習，全力為您提供舒適調理體驗",
-    bio: "準技師，持續精進筋膜調理技術，用心陪伴每一位客人。",
-    specialties: ["基礎筋膜放鬆", "全身調理"],
+    tagline: "曾自己開過徒手工作室，外放活潑、英語強，技術比外表更讓你意外",
+    bio: "很多人第一次見到我，會覺得：這麼活潑外向、這麼嬌小可愛，調理起來應該很輕柔吧？\n\n然後躺上去之後就不這麼想了。\n\n我之前自己開過徒手工作室，獨立接客、獨立處理各種狀況，後來又在其他職場繼續累積了一年多的實戰經驗。英文很流利，喜歡追國際最新的調理研究，把看到的東西直接用在你身上。\n\n我很愛說話、很愛分享，隨時都有聊不完的話題——但你知道嗎？當我突然安靜下來的時候，不是沒話說，而是我的手找到了什麼。那個瞬間的靜，往往是最關鍵的。",
+    specialties: ["解剖列車", "筋膜手法", "基礎按摩手法", "整體評估"],
     certifications: [],
     yearsExp: 1,
     allowedServiceIds: ["basic-60", "addon-20"],
@@ -194,13 +204,14 @@ export const teachers: Teacher[] = [
   {
     id: "jojo",
     name: "Jojo老師",
+    avatarText: "Jojo",
     level: "實習技師",
     gender: "female",
     storeIds: ["xiaoJudan"],
     photoPlaceholder: "",
-    tagline: "曾是上班族的我，用親身經歷陪伴每一個身體不適的你",
-    bio: "以前的我，也是個朝九晚五的上班族。長期久坐、高壓工作，加上運動後缺乏正確放鬆，讓身體累積了大量的緊繃與痠痛。直到發現自己的肩胛骨越來越突出，肩背不僅頻繁痠痛，嚴重時甚至還會出現麻感。\n\n在接觸徒手調整後，那些長期困擾我的不適逐漸獲得改善。那是我第一次感受到——原來，身體是可以慢慢還給自己的。\n\n因為這段經歷，讓我能更理解身體不適時的無力與無助。如果你也正與自己的身體拉鋸，我希望能用我的專業與陪伴，和你一起找到問題的原因，幫助身體慢慢回到更自在的狀態。",
-    specialties: ["解剖列車", "筋膜手法", "整體評估"],
+    tagline: "工程師出身，因為自己的肩膀出問題，走上了這條路",
+    bio: "我以前是工程師，每天面對大量數據、長時間坐在電腦前，身體一點一點在抗議，但我一直說「還好還好」。\n\n直到發現肩胛骨已經翹得很明顯，肩背持續痠痛，嚴重時手還會麻。去運動也沒改善，因為根本不知道問題出在哪裡——就這樣撐著，硬撐了很長一段時間。\n\n接觸徒手調理之後，才第一次感覺到身體「鬆開來」是什麼感覺。那個當下讓我決定轉行：我想幫和以前的我一樣，悶著頭苦撐、說不清楚哪裡出問題的人。\n\n工程師的背景讓我習慣找問題根源、不接受模糊的答案。你的身體不舒服，一定有原因——我們一起找。",
+    specialties: ["動作評估", "筋膜手法", "解剖列車", "羅夫按摩", "軟組織放鬆", "整體評估"],
     certifications: [
       "解剖列車（Anatomy Trains）徒手應用",
       "義大利筋膜手法（FM）徒手應用",
@@ -212,19 +223,20 @@ export const teachers: Teacher[] = [
   {
     id: "r3",
     name: "R3老師",
+    avatarText: "R3",
     level: "實習技師",
     gender: "male",
-    storeIds: ["xiaoJudan"],
+    storeIds: ["banqiao"],
     photoPlaceholder: "",
-    tagline: "用雙手的溫度傾聽身體訊號，帶著利他之心與您共鳴",
-    bio: "過去，我習慣用大腦的邏輯，專注於冷冰冰的產品品質；而現在，我選擇用雙手的溫度，去傾聽每一個生命背後的故事。\n\n經歷過高壓身心的洗禮，我深刻明白技術只是「方法」，能真正聽懂身體發出的訊號，才是「初心」。對我而言，筋膜調理不只是解開肌肉的緊繃，更是一場關於能量與平衡的修煉。\n\n當我的雙手觸碰，我會帶著純粹的利他之心，與您的身體頻率共鳴，陪伴您放下累積的緊繃與焦慮，找回久違的平衡與舒坦。",
-    specialties: ["解剖列車", "筋膜手法", "軟組織放鬆", "經絡手技"],
+    tagline: "年薪百萬科技業工程師，放棄高薪，只為把身體這件事做對",
+    bio: "我在科技業做工程師，年薪超過百萬。很多人聽到我轉行，第一個反應是：「為什麼？」\n\n因為我想做一件真正有意義的事。\n\n工程師的訓練讓我習慣把系統拆開來看——找輸入、找輸出、找哪個環節出了問題。後來發現人體也是一套精密的工程結構，筋膜、骨骼、動作模式，全部都有邏輯可循。解剖學和動作力學的知識，我背得比準備技術面試還認真。\n\n從科技業到調理師，薪水變了，但對「把事情做對」的執著沒有變。讓我用工程師的腦和真心投入的雙手，幫你把身體好好「除錯」。",
+    specialties: ["動作評估", "筋膜手法", "解剖列車", "羅夫按摩", "軟組織放鬆", "身體能量手技"],
     certifications: [
       "解剖列車（Anatomy Trains）徒手應用研習",
       "義大利筋膜技術（Fascial Manipulation）徒手應用研習",
       "全身軟組織肌肉放鬆 徒手應用",
       "系統性身體功能評估 研習",
-      "經絡十八子手技 200式",
+      "身體能量手技 進階研習",
     ],
     yearsExp: 0,
     allowedServiceIds: ["basic-60"],
@@ -233,13 +245,14 @@ export const teachers: Teacher[] = [
   {
     id: "atai",
     name: "阿鐵老師",
+    avatarText: "阿鐵",
     level: "技術長",
     gender: "male",
     storeIds: ["daan"],
     photoPlaceholder: "",
-    tagline: "結合臨床醫學與徒手調理，幫您解決痠痛、找回穩定狀態",
-    bio: "我投入身體工作約 5–6 年，目前就讀物理治療，並於各大醫院復健科臨床實習。\n\n一路以來，我結合臨床醫學與徒手調理，幫助大家解決痠痛、提升身體功能，甚至在運動與生活中找回更穩定的狀態。現在是大安店的技術長、FASCIA工具應用講師。",
-    specialties: ["臨床醫學整合", "整脊調理", "顱薦骨療法", "運動步態分析"],
+    tagline: "物理治療系畢業、近十年調理資歷，大安店技術長",
+    bio: "我踏入身體工作這個領域將近十年，物理治療系畢業、實習完成，並在各大醫院復健科累積了紮實的臨床實務經驗。學術與實務雙軌並進，讓我對身體結構和動作功能的理解比一般調理師更深一層。\n\n這些年來，我整合了多種國際認證手法與評估系統，幫助許多人從慢性痠痛中找到出路，也在運動和日常生活中重建更穩定的身體基礎。\n\n現在是大安店的技術長，也是法夏工具應用的培訓講師。帶著近十年的底子，我知道怎麼幫你找到真正的問題所在。",
+    specialties: ["動作評估", "筋膜手法", "解剖列車", "羅夫按摩", "軟組織放鬆", "結構整合調理", "顱薦骨放鬆", "運動步態分析"],
     certifications: [
       "EMT-1 初級救護員",
       "AMCT 整脊師（台灣自然醫學協會）",
@@ -260,13 +273,15 @@ export const teachers: Teacher[] = [
   {
     id: "miffy",
     name: "Miffy老師",
+    avatarText: "Miffy",
+    subtitle: "店長",
     level: "技師職人",
     gender: "female",
     storeIds: ["daan"],
     photoPlaceholder: "",
-    tagline: "推崇自然療法，陪伴您傾聽身體訊息、釋放緊繃、回歸平衡",
-    bio: "我推崇自然療法理念，認同透過調節生活型態（行為習慣/生活作息/運動冥想等）與自然元素來平衡身心。\n\n我有五年文創產業的背景，學會了如何覺察與共鳴；也在九年的女性生活領域中，持續探索「以人為本」的生活方式。\n\n我相信，身體的每一個緊繃與痠痛，都透露出訊息。讓我們一起傾聽、釋放、再一次回歸平衡與自由。",
-    specialties: ["筋膜徒手應用", "芳香調理", "自然療法", "整體評估"],
+    tagline: "文創背景、國際芳療師認證，讓調理成為你生活裡最值得的時光",
+    bio: "我在文創產業工作過，也取得了國際芳香調理師證照。這兩段經歷給了我同一件事：對「體驗感」的極度重視。\n\n文創教我美感和細節；芳療讓我理解氣味、觸感、環境對身心的影響遠超過我們以為的程度。把這些帶進筋膜調理，我在做的不只是鬆開你的肌肉——而是讓你從進門到離開，整個人都真正放下來。\n\n來找我的人，最後說的通常不是「比較不痠了」，而是「整個人輕了很多」。那種感覺，才是我想給你的。",
+    specialties: ["動作評估", "筋膜手法", "解剖列車", "羅夫按摩", "軟組織放鬆", "芳香調理", "自然療法", "整體評估"],
     certifications: [
       "系統性身體功能評估（SFMA）研習",
       "解剖列車（Anatomy Trains）徒手應用",
@@ -281,13 +296,14 @@ export const teachers: Teacher[] = [
   {
     id: "cindy",
     name: "Cindy老師",
+    avatarText: "Cindy",
     level: "技師職人",
     gender: "female",
-    storeIds: ["daan"],
+    storeIds: ["daan", "banqiao"],
     photoPlaceholder: "",
-    tagline: "細心傾聽、即時回應，讓每一位客人都感受到被理解與照顧",
-    bio: "我一直很喜歡「照顧與支持他人」。一路走來的服務經驗，讓我懂得如何細心傾聽、即時回應，最重要的是──讓每一位客人都能感受到被理解與被照顧。\n\n在法夏，我透過專業的筋膜放鬆與訓練，陪伴許多客人從痠痛不適逐漸改善，找回身體的平衡與自在。",
-    specialties: ["筋膜徒手應用", "聲音共振", "體適能訓練", "產康調理"],
+    tagline: "四年徒手資歷、餐飲業磨出的應對力，讓你從第一句話就覺得自在",
+    bio: "我有四年的徒手調理資歷，做過速食連鎖也做過高端餐飲，兩種截然不同的場域都待過——一個訓練你在最快的節奏下還能照顧好每一個人，另一個要求你在最講究的環境裡讓客人感覺被尊重。\n\n這兩段經歷加在一起，讓我變成一個很會讀人的人：你今天是輕鬆來放鬆的，還是某個地方一直在困擾你？我通常很快就能感覺到，然後調整我的方式。\n\n調理的技術我紮實地練了四年；如何讓你從踏進門就感覺舒服，是我在餐飲業學到的事。這兩件事我都不馬虎。",
+    specialties: ["動作評估", "筋膜手法", "解剖列車", "羅夫按摩", "軟組織放鬆", "聲音共振", "體適能訓練", "產康調理"],
     certifications: [
       "缽動身心・大銅缽聲音共振鬆筋膜經絡法",
       "體適能健身 C 級指導員",
@@ -303,19 +319,20 @@ export const teachers: Teacher[] = [
   {
     id: "wenyi",
     name: "雯儀老師",
+    avatarText: "雯儀",
     level: "技師職人",
     gender: "female",
     storeIds: ["daan"],
     photoPlaceholder: "",
-    tagline: "二十年顧客服務精神結合筋膜技術，讓您在放鬆中走向更健康",
-    bio: "我有超過二十年的顧客服務經驗，擅長觀察入微、讓人賓至如歸。快速理解客人的需求，並細心回應。\n\n加入法夏後，我把這份服務精神結合筋膜放鬆技術，陪伴大家在放鬆的同時，也逐步走向更健康的身心狀態。",
-    specialties: ["解剖列車", "筋膜手法", "經絡撥筋", "整體評估"],
+    tagline: "曾同時管理雙店、創下全品牌最高業績，現在用同樣的標準照顧你的身體",
+    bio: "我在連鎖餐飲業工作超過二十年，曾同時經營兩個據點，並在全品牌數百家門市中創下最高營業額紀錄——不是靠運氣，是靠對細節的極度要求，以及對每一位走進來的人都認真以對。\n\n那段經歷讓我學到：真正好的服務，是讓對方感覺被重視，而不是被服務。\n\n加入法夏後，我把二十年累積的直覺和筋膜技術結合在一起，讓我用雙手傾聽你的身體。我們都在這社會裡照顧人，現在也該換你被照顧了。",
+    specialties: ["動作評估", "筋膜手法", "解剖列車", "羅夫按摩", "軟組織放鬆", "整體評估"],
     certifications: [
       "解剖列車（Anatomy Trains）徒手應用",
       "義大利筋膜手法（FM）徒手應用",
       "系統性身體功能評估學",
       "應用解剖與肌肉動力學",
-      "經絡撥筋保健實務",
+      "軟組織保健手法研習",
     ],
     yearsExp: 3,
     allowedServiceIds: ["premium-120", "refined-90", "basic-60", "addon-20"],
@@ -324,13 +341,14 @@ export const teachers: Teacher[] = [
   {
     id: "yuchen",
     name: "宇辰老師",
+    avatarText: "宇辰",
     level: "技術長",
     gender: "male",
     storeIds: ["xiaoJudan", "daan"],
     photoPlaceholder: "",
     tagline: "FASCIA 法夏創辦人・技術總監・培訓導師",
     bio: "FASCIA 法夏創辦人，畢業於中華醫事大學調理保健技術系，首屆民俗調理傳統整復推拿技術士。\n\n深耕筋膜結構美學多年，整合國際頂尖筋膜療法，致力培訓台灣最專業的筋膜調理師，讓更多人找回身體的自然平衡。",
-    specialties: ["義大利筋膜手法", "顱薦骨療法", "Redcord訓練", "芳香療法"],
+    specialties: ["義大利筋膜手法", "顱薦骨放鬆", "Redcord訓練", "芳香調理"],
     certifications: [
       "中華醫事大學 調理保健技術系（畢）",
       "首屆民俗調理傳統整復推拿技術士",
@@ -394,7 +412,7 @@ export const services: Service[] = [
     name: "一對一功能式訓練",
     duration: 50,
     priceRegular: { "技師職人": 2500, "技術長": 2500, "準技師": 2500, "實習技師": 2500 },
-    priceMember:  { "技師職人": 2500, "技術長": 2500, "準技師": 2500, "實習技師": 2500 },
+    priceMember:  { "技師職人": 2000, "技術長": 2000, "準技師": 2000, "實習技師": 2000 },
     description: "個人化結構矯正訓練課程，由技師帶領進行針對性的核心與姿勢訓練，鞏固筋膜調理成效。",
     category: "training",
     onlineBookable: true,
@@ -426,23 +444,41 @@ export const services: Service[] = [
 export const membershipTiers = [
   {
     amount: 15000,
-    label: "會員",
-    benefits: ["享會員優惠價格"],
+    label: "法夏會員",
+    benefits: ["享儲值會員優惠價（全品項9.5折）"],
     vouchers: [] as string[],
   },
   {
     amount: 30000,
-    label: "進階會員",
-    benefits: ["享會員優惠價格", "結構訓練券 × 1"],
+    label: "黃金會員",
+    benefits: ["享儲值會員優惠價（全品項9.5折）", "贈結構訓練一堂（效期90天）"],
     vouchers: ["結構訓練券 × 1"],
   },
   {
     amount: 50000,
-    label: "頂級會員",
-    benefits: ["享會員優惠價格", "結構訓練券 × 1", "頻率檢測券 × 1"],
-    vouchers: ["結構訓練券 × 1", "頻率檢測券 × 1"],
+    label: "白金會員",
+    benefits: ["享儲值會員優惠價（全品項9.5折）", "贈頻率檢測一堂（效期90天）", "贈結構訓練一堂（效期90天）"],
+    vouchers: ["頻率檢測券 × 1", "結構訓練券 × 1"],
   },
 ];
+
+// ─── Monthly Booking Counts (mock — will come from real DB) ────────────────
+// Updated monthly; used to sort teachers by popularity on the booking page.
+export const monthlyBookingCounts: Record<string, number> = {
+  youtong:  18,
+  jimbo:    15,
+  hanhan:   14,
+  shuoyuan: 12,
+  daji:     11,
+  lily:      6,
+  jojo:      4,
+  r3:        3,
+  atai:     16,
+  miffy:    13,
+  cindy:    10,
+  wenyi:     9,
+  yuchen:    0, // staffOnly — not shown
+};
 
 // ─── Mock User ─────────────────────────────────────────────────────────────
 // Default new user state: $0 balance, no consent, no tier
@@ -458,11 +494,22 @@ export const mockUser = {
   totalSpent: 0,
   consentSigned: false,
   vouchers: [] as string[],
-  bookingHistory: [] as Array<{ id: string; date: string; store: string; teacher: string; service: string; amount: number }>,
+  bookingHistory: [
+    { id: "BK001", date: "2026-06-03", store: "小巨蛋店", teacher: "宥彤", service: "深層筋膜調理 60分", amount: 2200 },
+    { id: "BK002", date: "2026-05-17", store: "小巨蛋店", teacher: "宥彤", service: "深層筋膜調理 60分", amount: 2200 },
+    { id: "BK003", date: "2026-04-28", store: "大安店", teacher: "韓韓", service: "筋膜結構評估 90分", amount: 2800 },
+    { id: "BK004", date: "2026-04-05", store: "小巨蛋店", teacher: "宥彤", service: "深層筋膜調理 60分", amount: 2200 },
+    { id: "BK005", date: "2026-03-14", store: "大安店", teacher: "阿鐵", service: "筋膜結構評估 90分", amount: 2800 },
+    { id: "BK006", date: "2026-02-22", store: "小巨蛋店", teacher: "Jimbo", service: "深層筋膜調理 60分 + 加購20分", amount: 2800 },
+  ] as Array<{ id: string; date: string; store: string; teacher: string; service: string; amount: number }>,
 };
 
 // ─── Available Time Slots Generator ────────────────────────────────────────
-export function generateTimeSlots(date: Date, duration: number): TimeSlot[] {
+export function generateTimeSlots(
+  date: Date,
+  duration: number,
+  blockedPeriods?: Array<{ startTime: string; endTime: string }>
+): TimeSlot[] {
   const slots: TimeSlot[] = [];
   const startHour = 10;
   const endHour = 22;
@@ -504,9 +551,20 @@ export function generateTimeSlots(date: Date, duration: number): TimeSlot[] {
         (hour === 14 && min < 30) ||
         (dayOfWeek === 1); // Monday closed
 
+      // Check if slot overlaps with any blocked period
+      const slotStartMins = (hour - startHour) * 60 + min;
+      const slotEndMins = slotStartMins + duration;
+      const isBlockedByEvent = (blockedPeriods || []).some(period => {
+        const [bStartH, bStartM] = period.startTime.split(":").map(Number);
+        const [bEndH, bEndM] = period.endTime.split(":").map(Number);
+        const bStart = (bStartH - startHour) * 60 + bStartM;
+        const bEnd = (bEndH - startHour) * 60 + bEndM;
+        return slotStartMins < bEnd && slotEndMins > bStart;
+      });
+
       slots.push({
         time: timeStr,
-        available: !isUnavailable,
+        available: !isUnavailable && !isBlockedByEvent,
       });
     }
   }

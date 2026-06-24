@@ -43,6 +43,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
       { href: "/admin/services", label: "服務", icon: "◇" },
       { href: "/admin/reports", label: "報表", icon: "▦" },
       { href: "/admin/expenses", label: "費用", icon: "₩" },
+      { href: "/admin/inventory", label: "貨物", icon: "◻" },
     ] : []),
   ].filter(item => !item.hidden);
 
@@ -51,6 +52,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     { href: "/admin/services", label: "服務項目" },
     { href: "/admin/reports", label: "業績報表" },
     { href: "/admin/expenses", label: "費用管理" },
+    { href: "/admin/inventory", label: "貨物管理" },
     { href: "/admin/notifications", label: "通知設定" },
   ] : isManager ? [
     { href: "/admin/notifications", label: "通知設定" },
