@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAdmin } from "@/lib/adminContext";
 import {
-  ADMIN_BOOKINGS,
   ADMIN_STAFF,
   ADMIN_STORES,
   ADMIN_CUSTOMERS,
@@ -14,6 +13,7 @@ import {
   PaymentMethod,
   StaffEvent,
 } from "@/lib/adminMockData";
+import { getAdminBookings, updateBookingStatus, updateBookingNotes } from "@/lib/adminApi";
 
 // ─── Grid constants ─────────────────────────────────────────────────────────
 const TIME_SLOTS: string[] = [];
@@ -128,10 +128,10 @@ function StatusChip({ status }: { status: BookingStatus }) {
 // ─── Main component ──────────────────────────────────────────────────────────
 export default function BookingsPage() {
   const { user } = useAdmin();
-  const today = new Date("2026-06-18");
+  const today = new Date();
 
   // ── State ──
-  const [bookings, setBookings] = useState<AdminBooking[]>(ADMIN_BOOKINGS);
+  const [bookings, setBookings] = useState<AdminBooking[]>([]);
   const [selectedStoreId, setSelectedStoreId] = useState("ST01");
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState<Date>(today);
@@ -192,6 +192,60 @@ export default function BookingsPage() {
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
   const [customerQuery, setCustomerQuery] = useState("");
 
+  // Load bookings from Supabase
+  useEffect(() => {
+    (async () => {
+      const data = await getAdminBookings();
+      if (data.length > 0) {
+        // Map Supabase rows to AdminBooking shape
+        const mapped: AdminBooking[] = data.map((b: any) => ({
+          id: b.id,
+          date: b.date,
+          time: b.time_slot,
+          duration: b.duration ?? 60,
+          customerId: b.customer_id,
+          customerName: b.customers?.name ?? "—",
+          customerPhone: b.customers?.phone ?? "",
+          staffId: b.staff_id,
+          staffName: b.staff?.name ?? "—",
+          storeName: ADMIN_STORES.find(s => s.id === b.store_id)?.name ?? "—",
+          storeId: b.store_id,
+          serviceId: b.service_id,
+          serviceName: ADMIN_SERVICES.find(s => s.id === b.service_id)?.name ?? b.service_id,
+          price: b.total_price ?? 0,
+          status: mapStatus(b.status),
+          paymentMethod: (b.payment_method ?? "現金") as PaymentMethod,
+          notes: b.notes ?? "",
+          lineNotified: false,
+        }));
+        setBookings(mapped);
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function mapStatus(s: string): BookingStatus {
+    const map: Record<string, BookingStatus> = {
+      pending: "待確認",
+      confirmed: "已確認",
+      completed: "已完成",
+      cancelled: "已取消",
+      no_show: "爽約",
+    };
+    return map[s] ?? "已確認";
+  }
+
+  function toSupabaseStatus(s: BookingStatus): string {
+    const map: Record<BookingStatus, string> = {
+      待確認: "pending",
+      已確認: "confirmed",
+      已完成: "completed",
+      已取消: "cancelled",
+      爽約: "no_show",
+    };
+    return map[s];
+  }
+
   if (!user) return null;
 
   const isStaff = user.role === "員工";
@@ -243,6 +297,7 @@ export default function BookingsPage() {
   const updateStatus = (id: string, status: BookingStatus) => {
     setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
     if (detailBooking?.id === id) setDetailBooking((prev) => prev ? { ...prev, status } : null);
+    updateBookingStatus(id, toSupabaseStatus(status) as any);
   };
 
   const undoBooking = (b: AdminBooking) => {
@@ -289,6 +344,7 @@ export default function BookingsPage() {
     setDetailBooking((d) =>
       d ? { ...d, status: "已完成", paymentMethod: checkoutPayment } : null
     );
+    updateBookingStatus(detailBooking.id, "completed", checkoutPayment);
     setShowCheckout(false);
     setShowNegativeBalanceWarning(false);
   };
@@ -304,6 +360,7 @@ export default function BookingsPage() {
       prev.map((b) => (b.id === detailBooking.id ? { ...b, notes: noteText } : b))
     );
     setDetailBooking((d) => (d ? { ...d, notes: noteText } : null));
+    updateBookingNotes(detailBooking.id, noteText);
   };
 
   const openDetail = (b: AdminBooking) => {
