@@ -151,6 +151,12 @@ export default function SuccessPage() {
             再次預約
           </button>
           <button
+            onClick={() => router.push("/booking/history")}
+            className="w-full py-3 border border-[#e8ddd2] text-[#8b6748] text-sm font-medium rounded-2xl"
+          >
+            查看我的預約
+          </button>
+          <button
             onClick={() => { resetBooking(); router.push("/"); }}
             className="w-full py-3 text-sm text-gray-400"
           >

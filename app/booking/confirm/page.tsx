@@ -6,6 +6,7 @@ import { useBooking } from "@/lib/bookingContext";
 import BookingHeader from "@/components/BookingHeader";
 import Button from "@/components/ui/Button";
 import { getCustomerByLineId, createBooking } from "@/lib/customerApi";
+import { sendBookingConfirmation } from "@/lib/lineNotify";
 
 const DAYS_CN = ["日", "一", "二", "三", "四", "五", "六"];
 
@@ -98,6 +99,20 @@ export default function ConfirmPage() {
           addonId,
           totalPrice: finalPrice,
         });
+
+        // 傳送 LINE 預約確認通知
+        if (user.id) {
+          await sendBookingConfirmation({
+            lineUserId: user.id,
+            customerName: user.name,
+            storeName: selectedStore.name,
+            staffName: `${selectedTeacher.name} ${selectedTeacher.level}`,
+            serviceName: servicesToShow.map(s => s.name).join("、") + (hasAddon ? " +加購20分" : ""),
+            date: dateStr,
+            timeSlot: selectedTime,
+            totalPrice: finalPrice,
+          });
+        }
       }
     }
 
