@@ -217,6 +217,7 @@ export default function BookingsPage() {
           paymentMethod: (b.payment_method ?? "現金") as PaymentMethod,
           notes: b.notes ?? "",
           lineNotified: false,
+          bufferMinutes: 0,
         }));
         setBookings(mapped);
       }
