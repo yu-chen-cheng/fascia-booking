@@ -1,15 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAdmin } from "@/lib/adminContext";
-import {
-  ADMIN_CUSTOMERS,
-  ADMIN_BOOKINGS,
-  AdminCustomer,
-  STORED_VALUE_RECORDS,
-  STORED_VALUE_TIERS,
-} from "@/lib/adminMockData";
+import { STORED_VALUE_TIERS } from "@/lib/adminMockData";
 import { useRouter } from "next/navigation";
+import { getAdminCustomers, updateCustomer, getPendingTopups, approveTopup } from "@/lib/adminApi";
+import { getCustomerBookings } from "@/lib/customerApi";
 
 function TierBadge({ tier }: { tier: string }) {
   const colors: Record<string, string> = {
@@ -20,23 +16,48 @@ function TierBadge({ tier }: { tier: string }) {
   return <span className={`text-xs px-2 py-0.5 rounded-full border ${colors[tier] || ""}`}>{tier}</span>;
 }
 
-function parseVoucherAmount(voucher: string): number {
-  const match = voucher.match(/\$([0-9,]+)/);
-  if (!match) return 0;
-  return parseInt(match[1].replace(",", ""), 10);
+function memberTierLabel(level: string): string {
+  const map: Record<string, string> = {
+    general: "一般會員", member: "法夏會員", gold: "黃金會員", platinum: "白金會員",
+  };
+  return map[level] ?? level;
 }
 
 export default function CustomersPage() {
   const { user } = useAdmin();
   const router = useRouter();
-  const [customers, setCustomers] = useState<AdminCustomer[]>(ADMIN_CUSTOMERS);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [selectedCustomer, setSelectedCustomer] = useState<AdminCustomer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
+  const [customerBookings, setCustomerBookings] = useState<any[]>([]);
+  const [pendingTopups, setPendingTopups] = useState<any[]>([]);
   const [showStoredValueModal, setShowStoredValueModal] = useState(false);
+  const [showPendingTopups, setShowPendingTopups] = useState(false);
   const [selectedTierAmount, setSelectedTierAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesText, setNotesText] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const data = await getAdminCustomers();
+      setCustomers(data);
+      const topups = await getPendingTopups();
+      setPendingTopups(topups);
+      setLoading(false);
+    })();
+  }, []);
+
+  // Re-search when search changes
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      const data = await getAdminCustomers(search || undefined);
+      setCustomers(data);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   if (!user) return null;
   if (user.role === "員工") {
@@ -48,51 +69,55 @@ export default function CustomersPage() {
     );
   }
 
-  const filtered = customers.filter(c =>
-    c.name.includes(search) || c.phone.includes(search)
-  );
-
-  const getCompletedCount = (customerId: string) =>
-    ADMIN_BOOKINGS.filter(b => b.customerId === customerId && b.status === "已完成").length;
-
-  const getRecentBookings = (customerId: string) =>
-    ADMIN_BOOKINGS
-      .filter(b => b.customerId === customerId)
-      .sort((a, b) => (a.date + a.time) > (b.date + b.time) ? -1 : 1)
-      .slice(0, 3);
-
-  const getStoredValueRecords = (customerId: string) =>
-    STORED_VALUE_RECORDS.filter(r => r.customerId === customerId);
-
-  const openProfile = (c: AdminCustomer) => {
+  const openProfile = async (c: any) => {
     setSelectedCustomer(c);
     setEditingNotes(false);
-    setNotesText(c.bodyNotes);
+    setNotesText(c.body_notes ?? "");
+    const bookings = await getCustomerBookings(c.id);
+    setCustomerBookings(bookings);
   };
 
-  const saveNotes = () => {
+  const saveNotes = async () => {
     if (!selectedCustomer) return;
-    setCustomers(prev => prev.map(c => c.id === selectedCustomer.id ? { ...c, bodyNotes: notesText } : c));
-    setSelectedCustomer(prev => prev ? { ...prev, bodyNotes: notesText } : prev);
+    await updateCustomer(selectedCustomer.id, { bodyNotes: notesText });
+    setCustomers(prev => prev.map(c => c.id === selectedCustomer.id ? { ...c, body_notes: notesText } : c));
+    setSelectedCustomer((prev: any) => prev ? { ...prev, body_notes: notesText } : prev);
     setEditingNotes(false);
   };
 
-  const confirmStoredValue = () => {
+  const confirmStoredValue = async () => {
     if (!selectedCustomer) return;
     const amount = selectedTierAmount ?? (customAmount ? Number(customAmount) : 0);
     if (!amount || amount <= 0) return;
-    setCustomers(prev => prev.map(c => c.id === selectedCustomer.id ? { ...c, storedValue: c.storedValue + amount } : c));
-    setSelectedCustomer(prev => prev ? { ...prev, storedValue: prev.storedValue + amount } : prev);
+    const newBalance = (selectedCustomer.stored_value ?? 0) + amount;
+    await updateCustomer(selectedCustomer.id, { storedValue: newBalance });
+    setCustomers(prev => prev.map(c => c.id === selectedCustomer.id ? { ...c, stored_value: newBalance } : c));
+    setSelectedCustomer((prev: any) => prev ? { ...prev, stored_value: newBalance } : prev);
     setShowStoredValueModal(false);
     setSelectedTierAmount(null);
     setCustomAmount("");
   };
 
+  const handleApproveTopup = async (topup: any) => {
+    await approveTopup(topup.id, topup.customer_id, topup.amount);
+    setPendingTopups(prev => prev.filter(t => t.id !== topup.id));
+  };
+
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold text-[#1c1c1c]">會員管理</h1>
-        <p className="text-sm text-[#8a7a6e] mt-1">共 {customers.length} 位會員</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-[#1c1c1c]">會員管理</h1>
+          <p className="text-sm text-[#8a7a6e] mt-1">共 {customers.length} 位會員</p>
+        </div>
+        {pendingTopups.length > 0 && (
+          <button
+            onClick={() => setShowPendingTopups(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700"
+          >
+            💰 待審儲值 <span className="bg-amber-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">{pendingTopups.length}</span>
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -107,10 +132,11 @@ export default function CustomersPage() {
       </div>
 
       {/* Customer list */}
+      {loading ? (
+        <div className="text-center py-12 text-sm text-[#8a7a6e]">載入中…</div>
+      ) : (
       <div className="space-y-3">
-        {filtered.map(c => {
-          const completedCount = getCompletedCount(c.id);
-          return (
+        {customers.map((c: any) => (
             <button
               key={c.id}
               onClick={() => openProfile(c)}
@@ -119,29 +145,74 @@ export default function CustomersPage() {
               <div className="flex items-start justify-between mb-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-[#1c1c1c]">{c.name}</span>
-                  {c.hasLine && (
+                  {c.line_user_id && (
                     <span className="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-bold bg-[#06c755] text-white leading-none">LINE</span>
                   )}
-                  {c.bodyNotes && c.bodyNotes.trim() && (
-                    <span className="text-red-500 text-xs ml-1" title={c.bodyNotes}>❗</span>
+                  {c.body_notes && c.body_notes.trim() && (
+                    <span className="text-red-500 text-xs ml-1" title={c.body_notes}>❗</span>
                   )}
-                  <TierBadge tier={c.memberTier} />
+                  <TierBadge tier={memberTierLabel(c.membership_level)} />
                 </div>
-                <span className="text-xs text-[#8a7a6e]">調理 {completedCount} 次</span>
+                <span className="text-xs text-[#8a7a6e]">累計 ${(c.total_spent ?? 0).toLocaleString()}</span>
               </div>
               <div className="text-xs text-[#8a7a6e] mb-1">{c.phone}</div>
-              {c.bodyNotes && (
+              {c.body_notes && (
                 <div className="mt-2 px-2 py-1.5 bg-amber-50 rounded-lg text-xs text-amber-700 line-clamp-1">
-                  ⚠ {c.bodyNotes}
+                  ⚠ {c.body_notes}
                 </div>
               )}
             </button>
-          );
-        })}
-        {filtered.length === 0 && (
+          ))}
+        {customers.length === 0 && (
           <div className="text-center py-12 text-sm text-[#8a7a6e]">無符合搜尋結果</div>
         )}
       </div>
+      )}
+
+      {/* Pending topups modal */}
+      {showPendingTopups && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center" onClick={() => setShowPendingTopups(false)}>
+          <div className="bg-white w-full max-w-lg rounded-t-3xl max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#e8ddd2]">
+              <h3 className="text-base font-semibold text-[#1c1c1c]">待審儲值申請</h3>
+              <button onClick={() => setShowPendingTopups(false)} className="text-[#8a7a6e] text-xl">✕</button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              {pendingTopups.length === 0 ? (
+                <p className="text-sm text-center text-[#8a7a6e] py-6">目前無待審申請</p>
+              ) : pendingTopups.map((t: any) => (
+                <div key={t.id} className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <div className="text-sm font-semibold text-[#1c1c1c]">{t.customers?.name} · {t.customers?.phone}</div>
+                      <div className="text-xs text-[#8a7a6e] mt-0.5">
+                        {t.payment_method === "transfer" ? "匯款" : "信用卡"} · 申請金額 ${t.amount.toLocaleString()}
+                      </div>
+                      {t.transfer_ref && <div className="text-xs text-[#8a7a6e]">匯款帳號末五碼：{t.transfer_ref}</div>}
+                      <div className="text-xs text-[#8a7a6e]">{new Date(t.created_at).toLocaleString("zh-TW")}</div>
+                    </div>
+                    <span className="text-sm font-bold text-amber-700">${t.amount.toLocaleString()}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleApproveTopup(t)}
+                      className="flex-1 py-2 bg-green-600 text-white rounded-lg text-xs font-medium"
+                    >
+                      確認入帳
+                    </button>
+                    <button
+                      onClick={() => setPendingTopups(prev => prev.filter(x => x.id !== t.id))}
+                      className="flex-1 py-2 border border-gray-200 text-gray-500 rounded-lg text-xs"
+                    >
+                      略過
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Profile bottom sheet */}
       {selectedCustomer && !showStoredValueModal && (
@@ -154,7 +225,7 @@ export default function CustomersPage() {
             <div className="flex items-center justify-between px-5 pt-5 pb-3 bg-white rounded-t-3xl border-b border-[#e8ddd2]">
               <div className="flex items-center gap-2">
                 <span className="text-base font-semibold text-[#1c1c1c]">{selectedCustomer.name}</span>
-                <TierBadge tier={selectedCustomer.memberTier} />
+                <TierBadge tier={memberTierLabel(selectedCustomer.membership_level)} />
               </div>
               <button onClick={() => setSelectedCustomer(null)} className="text-[#8a7a6e] text-xl leading-none">✕</button>
             </div>
@@ -163,9 +234,9 @@ export default function CustomersPage() {
               {/* Stats row */}
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { label: "累計消費", value: `$${selectedCustomer.totalSpent.toLocaleString()}` },
-                  { label: "儲值餘額", value: `$${selectedCustomer.storedValue.toLocaleString()}` },
-                  { label: "調理次數", value: `${getCompletedCount(selectedCustomer.id)} 次` },
+                  { label: "累計消費", value: `$${(selectedCustomer.total_spent ?? 0).toLocaleString()}` },
+                  { label: "儲值餘額", value: `$${(selectedCustomer.stored_value ?? 0).toLocaleString()}` },
+                  { label: "近期調理", value: `${customerBookings.filter((b: any) => b.status === "completed").length} 次` },
                 ].map(stat => (
                   <div key={stat.label} className="bg-white rounded-xl p-3 text-center border border-[#e8ddd2]">
                     <div className="text-sm font-semibold text-[#8b6748]">{stat.value}</div>
@@ -179,7 +250,7 @@ export default function CustomersPage() {
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-medium text-amber-700">身體狀況備註</span>
                   {!editingNotes && (
-                    <button onClick={() => { setEditingNotes(true); setNotesText(selectedCustomer.bodyNotes); }} className="text-amber-600 text-xs flex items-center gap-1">
+                    <button onClick={() => { setEditingNotes(true); setNotesText(selectedCustomer.body_notes ?? ""); }} className="text-amber-600 text-xs flex items-center gap-1">
                       ✏ 編輯
                     </button>
                   )}
@@ -199,59 +270,39 @@ export default function CustomersPage() {
                   </>
                 ) : (
                   <p className="text-sm text-amber-800 leading-relaxed">
-                    {selectedCustomer.bodyNotes || <span className="text-amber-400 italic">無備註</span>}
+                    {selectedCustomer.body_notes || <span className="text-amber-400 italic">無備註</span>}
                   </p>
                 )}
               </div>
 
-              {/* Preferred staff */}
-              <div className="bg-white rounded-xl p-4 border border-[#e8ddd2]">
-                <span className="text-xs font-medium text-[#8a7a6e]">慣用技師</span>
-                <p className="text-sm text-[#1c1c1c] mt-1">{selectedCustomer.preferredStaffName ?? "無指定"}</p>
+              {/* Contact info */}
+              <div className="bg-white rounded-xl p-4 border border-[#e8ddd2] space-y-1">
+                <div className="text-xs font-medium text-[#8a7a6e] mb-2">聯絡資訊</div>
+                <div className="text-sm text-[#1c1c1c]">📞 {selectedCustomer.phone}</div>
+                {selectedCustomer.email && <div className="text-sm text-[#1c1c1c]">✉ {selectedCustomer.email}</div>}
+                {selectedCustomer.birthday && <div className="text-sm text-[#1c1c1c]">🎂 {selectedCustomer.birthday}</div>}
               </div>
 
               {/* Recent bookings */}
               <div className="bg-white rounded-xl p-4 border border-[#e8ddd2]">
-                <h4 className="text-xs font-medium text-[#8a7a6e] mb-3">近期調理</h4>
-                {getRecentBookings(selectedCustomer.id).length === 0 ? (
+                <h4 className="text-xs font-medium text-[#8a7a6e] mb-3">近期調理紀錄</h4>
+                {customerBookings.length === 0 ? (
                   <p className="text-sm text-[#8a7a6e]">尚無紀錄</p>
                 ) : (
                   <div className="space-y-2">
-                    {getRecentBookings(selectedCustomer.id).map(b => (
-                      <div key={b.id} className="flex items-center justify-between py-1.5 border-b border-[#f5f0e8] last:border-0">
-                        <div>
-                          <div className="text-xs text-[#1c1c1c]">{b.date} {b.time}</div>
-                          <div className="text-xs text-[#8a7a6e]">{b.serviceName} · {b.staffName}</div>
-                        </div>
-                        <span className={`text-xs ${b.status === "已完成" ? "text-green-600" : b.status === "已取消" ? "text-gray-400" : "text-amber-600"}`}>{b.status}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Stored value records */}
-              <div className="bg-white rounded-xl p-4 border border-[#e8ddd2]">
-                <h4 className="text-xs font-medium text-[#8a7a6e] mb-3">儲值紀錄</h4>
-                {getStoredValueRecords(selectedCustomer.id).length === 0 ? (
-                  <p className="text-sm text-[#8a7a6e]">尚無儲值紀錄</p>
-                ) : (
-                  <div className="space-y-2">
-                    {getStoredValueRecords(selectedCustomer.id).map(r => (
-                      <div key={r.id} className="py-2 border-b border-[#f5f0e8] last:border-0">
-                        <div className="flex justify-between items-start">
+                    {customerBookings.slice(0, 5).map((b: any) => {
+                      const statusMap: Record<string, string> = { confirmed: "已確認", completed: "已完成", cancelled: "已取消", no_show: "爽約", pending: "待確認" };
+                      const statusColor: Record<string, string> = { completed: "text-green-600", cancelled: "text-gray-400", no_show: "text-red-500" };
+                      return (
+                        <div key={b.id} className="flex items-center justify-between py-1.5 border-b border-[#f5f0e8] last:border-0">
                           <div>
-                            <div className="text-sm font-medium text-[#1c1c1c]">${r.amount.toLocaleString()}</div>
-                            <div className="text-xs text-[#8a7a6e]">{r.date} · {r.tier}</div>
-                            <div className="text-xs text-[#8a7a6e]">贈品：{r.gift}</div>
+                            <div className="text-xs text-[#1c1c1c]">{b.date} {b.time_slot}</div>
+                            <div className="text-xs text-[#8a7a6e]">{b.service_id} · ${(b.total_price ?? 0).toLocaleString()}</div>
                           </div>
-                          <span className={`text-xs px-2 py-0.5 rounded-full border ${r.giftExpired ? "bg-gray-100 text-gray-500 border-gray-200" : r.giftClaimed ? "bg-green-50 text-green-700 border-green-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
-                            {r.giftExpired ? "已過期" : r.giftClaimed ? "已使用" : "未使用"}
-                          </span>
+                          <span className={`text-xs ${statusColor[b.status] ?? "text-amber-600"}`}>{statusMap[b.status] ?? b.status}</span>
                         </div>
-                        <div className="text-xs text-[#8a7a6e] mt-1">效期至 {r.giftExpiry}</div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
