@@ -118,10 +118,11 @@ export default function ConfirmPage() {
           return;
         }
 
-        // 傳送 LINE 預約確認通知
-        if (user.id) {
+        // 傳送 LINE 預約確認通知（優先用 OA userId，否則用 LIFF userId）
+        const notifyUserId = customer.oa_user_id || user.id;
+        if (notifyUserId) {
           await sendBookingConfirmation({
-            lineUserId: user.id,
+            lineUserId: notifyUserId,
             customerName: user.name,
             storeName: selectedStore.name,
             staffName: `${selectedTeacher.name} ${selectedTeacher.level}`,
