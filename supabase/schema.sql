@@ -133,6 +133,40 @@ CREATE TRIGGER membership_auto_upgrade
   BEFORE UPDATE ON customers
   FOR EACH ROW EXECUTE FUNCTION auto_upgrade_membership();
 
+-- ── Row Level Security ─────────────────────────────────────
+-- 讓前台（anon 金鑰）可以讀寫自己的資料
+
+ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vouchers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE topup_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_inquiries ENABLE ROW LEVEL SECURITY;
+
+-- customers: anon 可 upsert/select（依 line_user_id）
+CREATE POLICY "anon can upsert customers" ON customers
+  FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- bookings: anon 可 insert/select
+CREATE POLICY "anon can manage bookings" ON bookings
+  FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- vouchers: anon 可 select/insert
+CREATE POLICY "anon can manage vouchers" ON vouchers
+  FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- topup_records: anon 可 insert/select
+CREATE POLICY "anon can manage topup" ON topup_records
+  FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- reviews: anon 可 insert/select
+CREATE POLICY "anon can manage reviews" ON reviews
+  FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- product_inquiries: anon 可 insert
+CREATE POLICY "anon can insert product_inquiries" ON product_inquiries
+  FOR ALL TO anon USING (true) WITH CHECK (true);
+
 -- ── 常用 Index ─────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_customers_line_user_id ON customers(line_user_id);
 CREATE INDEX IF NOT EXISTS idx_customers_total_spent ON customers(total_spent);

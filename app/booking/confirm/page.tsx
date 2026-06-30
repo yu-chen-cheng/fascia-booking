@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useBooking } from "@/lib/bookingContext";
 import BookingHeader from "@/components/BookingHeader";
 import Button from "@/components/ui/Button";
-import { getCustomerByLineId, createBooking } from "@/lib/customerApi";
+import { getCustomerByLineId, createBooking, upsertCustomer } from "@/lib/customerApi";
 import { sendBookingConfirmation } from "@/lib/lineNotify";
 
 const DAYS_CN = ["日", "一", "二", "三", "四", "五", "六"];
@@ -83,12 +83,24 @@ export default function ConfirmPage() {
 
     // 寫入 Supabase
     if (user && selectedStore && selectedTeacher && selectedDate && selectedTime) {
-      const customer = await getCustomerByLineId(user.id);
+      let customer = await getCustomerByLineId(user.id);
+      // 若客戶資料不存在，先自動建立
+      if (!customer && user.id && user.name) {
+        const upserted = await upsertCustomer({
+          lineUserId: user.id,
+          name: user.name,
+          phone: user.phone || "",
+          email: user.email || undefined,
+          birthday: user.birthday || undefined,
+          consentSigned: true,
+        });
+        customer = upserted;
+      }
       if (customer) {
         const serviceId = servicesToShow[0]?.id ?? "";
         const addonId = hasAddon ? "addon-20" : undefined;
         const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`;
-        await createBooking({
+        const booking = await createBooking({
           customerId: customer.id,
           storeId: selectedStore.id,
           serviceId,
@@ -99,6 +111,12 @@ export default function ConfirmPage() {
           addonId,
           totalPrice: finalPrice,
         });
+
+        if (!booking) {
+          setSubmitting(false);
+          alert("預約建立失敗，請稍後再試或聯繫門市。");
+          return;
+        }
 
         // 傳送 LINE 預約確認通知
         if (user.id) {
@@ -113,7 +131,15 @@ export default function ConfirmPage() {
             totalPrice: finalPrice,
           });
         }
+      } else {
+        setSubmitting(false);
+        alert("無法取得客戶資料，請重新登入後再試。");
+        return;
       }
+    } else {
+      setSubmitting(false);
+      alert("預約資料不完整，請重新選擇。");
+      return;
     }
 
     setSubmitting(false);
