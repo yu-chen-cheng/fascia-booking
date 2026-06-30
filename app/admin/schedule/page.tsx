@@ -1,475 +1,445 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAdmin } from "@/lib/adminContext";
-import { ADMIN_STAFF, ADMIN_BOOKINGS, ADMIN_STORES, AdminStaff, AdminBooking } from "@/lib/adminMockData";
+import { supabase } from "@/lib/supabase";
 
-// Time axis: 07:00 – 24:00, 30-min increments
-const TIME_SLOTS: string[] = [];
-for (let h = 7; h <= 24; h++) {
-  for (let m = 0; m < 60; m += 30) {
-    if (h === 24 && m > 0) break;
-    TIME_SLOTS.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
-  }
-}
+const EVENT_TYPES = ["早班", "晚班", "全班", "病假", "事假", "進修", "自訂"] as const;
+type EventType = typeof EVENT_TYPES[number];
 
-// Slot grid constants
-const ROW_HEIGHT = 48; // px per 30-min slot
-const HEADER_HEIGHT = 64; // px for column header
-
-function formatDate(d: Date) {
-  return d.toISOString().split("T")[0];
-}
-
-function getWeekStart(base: Date, offset: number): Date {
-  // Monday of the week containing base + offset*7 days
-  const d = new Date(base);
-  d.setDate(d.getDate() + offset * 7);
-  const day = d.getDay(); // 0=Sun
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  return d;
-}
-
-function getWeekDays(weekStart: Date): Date[] {
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + i);
-    return d;
-  });
-}
-
-const DAY_NAMES = ["一", "二", "三", "四", "五", "六", "日"];
-
-// Convert "HH:MM" to minutes from 07:00
-function timeToMinutes(time: string): number {
-  const [h, m] = time.split(":").map(Number);
-  return (h - 7) * 60 + m;
-}
-
-// Compute top offset and height in px for a booking card
-function bookingStyle(time: string, duration: number): { top: number; height: number } {
-  const startMin = timeToMinutes(time);
-  const top = HEADER_HEIGHT + (startMin / 30) * ROW_HEIGHT;
-  const height = Math.max((duration / 30) * ROW_HEIGHT - 4, ROW_HEIGHT - 4);
-  return { top, height };
-}
-
-// Service short codes
-const SERVICE_CODES: Record<string, string> = {
-  "SV01": "基礎",
-  "SV02": "精緻",
-  "SV03": "頂級",
-  "SV04": "訓練",
-  "SV05": "頻檢",
-  "SV06": "+20",
+const EVENT_COLORS: Record<EventType, string> = {
+  早班: "bg-blue-100 text-blue-800 border-blue-200",
+  晚班: "bg-purple-100 text-purple-800 border-purple-200",
+  全班: "bg-indigo-100 text-indigo-800 border-indigo-200",
+  病假: "bg-red-100 text-red-700 border-red-200",
+  事假: "bg-orange-100 text-orange-700 border-orange-200",
+  進修: "bg-green-100 text-green-700 border-green-200",
+  自訂: "bg-amber-100 text-amber-800 border-amber-200",
 };
+
+const DAY_NAMES = ["日", "一", "二", "三", "四", "五", "六"];
+
+interface ScheduleEvent {
+  id: string;
+  staff_id: string;
+  branch_id: string;
+  date: string;
+  event_type: EventType;
+  start_time: string | null;
+  end_time: string | null;
+  custom_label: string | null;
+  blocks_booking: boolean;
+}
+
+interface StaffProfile {
+  id: string;
+  name: string;
+  branch_id: string;
+  role: string;
+}
+
+function getDaysInMonth(year: number, month: number): Date[] {
+  const days: Date[] = [];
+  const d = new Date(year, month, 1);
+  while (d.getMonth() === month) {
+    days.push(new Date(d));
+    d.setDate(d.getDate() + 1);
+  }
+  return days;
+}
+
+function toYMD(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 export default function SchedulePage() {
   const { user } = useAdmin();
-  const today = new Date("2026-06-18");
+  const today = new Date();
+  const todayYMD = toYMD(today);
 
-  const [selectedDate, setSelectedDate] = useState<Date>(today);
-  const [selectedStoreId, setSelectedStoreId] = useState<string>("ST01");
-  const [weekOffset, setWeekOffset] = useState(0);
-  const [openSlots, setOpenSlots] = useState<Record<string, boolean>>({});
-  const [showCopyModal, setShowCopyModal] = useState(false);
-  const [copySuccess, setCopySuccess] = useState(false);
-  const [openStaffPanel, setOpenStaffPanel] = useState<string | null>(null); // staffId with open panel
-  const [bufferMap, setBufferMap] = useState<Record<string, number>>({});
+  const isStaff = user?.role === "員工";
+  const isAdmin = user?.role === "管理者" || user?.role === "店長";
+
+  // 排班可編輯的月份範圍：每月20號起員工可填寫下兩個月，25號起客人才看得到新班表
+  const canEditNextMonths = today.getDate() >= 20;
+  const editableMonths: string[] = [];
+  // 本月永遠可以看（但不一定可以編輯）
+  const baseMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  for (let i = 1; i <= 2; i++) {
+    const m = new Date(baseMonth);
+    m.setMonth(m.getMonth() + i);
+    editableMonths.push(`${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`);
+  }
+
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+  const [staffList, setStaffList] = useState<StaffProfile[]>([]);
+  const [selectedStaffId, setSelectedStaffId] = useState<string>("");
+  const [events, setEvents] = useState<ScheduleEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedBranch, setSelectedBranch] = useState(user?.branchId ?? "ST01");
+
+  // Modal state
+  const [modalDate, setModalDate] = useState<string | null>(null);
+  const [modalEvent, setModalEvent] = useState<ScheduleEvent | null>(null);
+  const [form, setForm] = useState<{
+    event_type: EventType;
+    start_time: string;
+    end_time: string;
+    custom_label: string;
+    blocks_booking: boolean;
+  }>({ event_type: "早班", start_time: "10:00", end_time: "19:00", custom_label: "", blocks_booking: true });
+  const [saving, setSaving] = useState(false);
+
+  const BRANCHES = [
+    { id: "ST01", name: "小巨蛋店" },
+    { id: "ST02", name: "大安店" },
+    { id: "ST03", name: "板橋店" },
+  ];
+
+  const fetchStaff = useCallback(async () => {
+    const q = supabase.from("staff_profiles").select("id,name,branch_id,role").eq("is_active", true);
+    if (!isAdmin) {
+      // 員工只看自己
+      q.eq("id", user?.id ?? "");
+    } else {
+      q.eq("branch_id", selectedBranch);
+    }
+    const { data } = await q.order("name");
+    setStaffList(data ?? []);
+    if (data && data.length > 0 && !selectedStaffId) {
+      setSelectedStaffId(isStaff ? (user?.id ?? data[0].id) : data[0].id);
+    }
+  }, [isAdmin, isStaff, selectedBranch, user?.id, selectedStaffId]);
+
+  const fetchEvents = useCallback(async () => {
+    if (!selectedStaffId && isStaff) return;
+    const yearStr = String(viewYear);
+    const monthStr = String(viewMonth + 1).padStart(2, "0");
+    const startDate = `${yearStr}-${monthStr}-01`;
+    const endDate = `${yearStr}-${monthStr}-31`;
+
+    let q = supabase.from("schedules").select("*")
+      .gte("date", startDate).lte("date", endDate);
+
+    if (isStaff) {
+      q = q.eq("staff_id", user?.id ?? "");
+    } else if (selectedStaffId) {
+      q = q.eq("staff_id", selectedStaffId);
+    } else {
+      // 全部分店人員
+      const ids = staffList.map(s => s.id);
+      if (ids.length > 0) q = q.in("staff_id", ids);
+    }
+
+    const { data } = await q;
+    setEvents(data ?? []);
+    setLoading(false);
+  }, [selectedStaffId, isStaff, viewYear, viewMonth, user?.id, staffList]);
+
+  useEffect(() => { fetchStaff(); }, [selectedBranch]);
+  useEffect(() => { if (staffList.length > 0 || !isAdmin) fetchEvents(); }, [viewYear, viewMonth, selectedStaffId, staffList]);
+
+  const days = getDaysInMonth(viewYear, viewMonth);
+  const firstDayOfWeek = days[0].getDay(); // 0=Sun
+
+  const viewMonthKey = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`;
+  const isEditable = canEditNextMonths
+    ? editableMonths.includes(viewMonthKey) || viewMonthKey === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`
+    : viewMonthKey === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+
+  const prevMonth = () => {
+    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
+    else setViewMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0); }
+    else setViewMonth(m => m + 1);
+  };
+
+  const eventsOnDate = (date: string) =>
+    events.filter(e => e.date === date && (isStaff ? e.staff_id === user?.id : selectedStaffId ? e.staff_id === selectedStaffId : true));
+
+  const openAdd = (date: string) => {
+    if (!isEditable) return;
+    setModalDate(date);
+    setModalEvent(null);
+    setForm({ event_type: "早班", start_time: "10:00", end_time: "19:00", custom_label: "", blocks_booking: true });
+  };
+
+  const openEdit = (e: ScheduleEvent) => {
+    if (!isEditable) return;
+    setModalDate(e.date);
+    setModalEvent(e);
+    setForm({
+      event_type: e.event_type,
+      start_time: e.start_time ?? "10:00",
+      end_time: e.end_time ?? "19:00",
+      custom_label: e.custom_label ?? "",
+      blocks_booking: e.blocks_booking,
+    });
+  };
+
+  const handleSave = async () => {
+    if (!modalDate) return;
+    setSaving(true);
+    const staffId = isStaff ? user?.id : selectedStaffId;
+    if (!staffId) { setSaving(false); return; }
+
+    const payload = {
+      staff_id: staffId,
+      branch_id: isStaff ? user?.branchId : selectedBranch,
+      date: modalDate,
+      event_type: form.event_type,
+      start_time: form.start_time || null,
+      end_time: form.end_time || null,
+      custom_label: form.event_type === "自訂" ? form.custom_label : null,
+      blocks_booking: form.blocks_booking,
+    };
+
+    if (modalEvent) {
+      await supabase.from("schedules").update(payload).eq("id", modalEvent.id);
+    } else {
+      await supabase.from("schedules").insert(payload);
+    }
+    await fetchEvents();
+    setModalDate(null);
+    setSaving(false);
+  };
+
+  const handleDelete = async () => {
+    if (!modalEvent) return;
+    setSaving(true);
+    await supabase.from("schedules").delete().eq("id", modalEvent.id);
+    await fetchEvents();
+    setModalDate(null);
+    setSaving(false);
+  };
 
   if (!user) return null;
 
-  const isStaff = user.role === "員工";
-  const myStaff = ADMIN_STAFF.find(s => s.username === user.username);
-
-  const storeStaff: AdminStaff[] = isStaff
-    ? (myStaff ? [myStaff] : [])
-    : ADMIN_STAFF.filter(s => s.storeId === selectedStoreId);
-
-  const weekStart = getWeekStart(today, weekOffset);
-  const weekDays = getWeekDays(weekStart);
-
-  const dateStr = formatDate(selectedDate);
-
-  const todayDate = today.getDate();
-  const show25Banner = todayDate >= 20 && todayDate <= 31;
-  const isPast25 = todayDate >= 25;
-
-  const getSlotKey = (staffId: string, time: string) => `${staffId}|${dateStr}|${time}`;
-
-  const toggleSlot = (staffId: string, time: string) => {
-    const key = getSlotKey(staffId, time);
-    setOpenSlots(prev => ({ ...prev, [key]: !(prev[key] ?? true) }));
-  };
-
-  const setAllSlots = (value: boolean) => {
-    const updates: Record<string, boolean> = {};
-    storeStaff.forEach(s => {
-      TIME_SLOTS.forEach(time => {
-        updates[getSlotKey(s.id, time)] = value;
-      });
-    });
-    setOpenSlots(prev => ({ ...prev, ...updates }));
-  };
-
-  const handleCopySchedule = () => {
-    setShowCopyModal(false);
-    setCopySuccess(true);
-    setTimeout(() => setCopySuccess(false), 3000);
-  };
-
-  const dayBookingsAll: AdminBooking[] = ADMIN_BOOKINGS.filter(b => b.date === dateStr);
-  const dayBookingsForStore = isStaff
-    ? dayBookingsAll.filter(b => b.staffId === myStaff?.id)
-    : dayBookingsAll.filter(b => storeStaff.some(s => s.id === b.staffId));
-
-  const staffBookingCount = (staffId: string) =>
-    dayBookingsForStore.filter(b => b.staffId === staffId).length;
-
-  const totalGridHeight = HEADER_HEIGHT + TIME_SLOTS.length * ROW_HEIGHT + 16;
+  const currentStaffName = isStaff ? user.name : staffList.find(s => s.id === selectedStaffId)?.name ?? "";
 
   return (
-    <div className="p-4 md:p-6 max-w-full">
-      {/* Page header */}
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-[#1c1c1c]">排班管理</h1>
-          {!isStaff && <p className="text-sm text-[#8a7a6e] mt-0.5">週視圖 · 員工為欄位</p>}
-        </div>
-        {!isStaff && (
-          <div className="flex gap-2">
-            <button
-              onClick={() => setAllSlots(false)}
-              className="px-3 py-1.5 rounded-xl text-sm border border-gray-300 bg-gray-100 text-gray-700 hover:bg-gray-200"
-            >
-              全關
-            </button>
-            <button
-              onClick={() => setAllSlots(true)}
-              className="px-3 py-1.5 rounded-xl text-sm border border-green-300 bg-green-50 text-green-700 hover:bg-green-100"
-            >
-              全開
-            </button>
-            <button
-              onClick={() => setShowCopyModal(true)}
-              className="px-3 py-1.5 rounded-xl text-sm border border-[#e8ddd2] bg-white text-[#8b6748] hover:bg-[#faf7f2]"
-            >
-              複製班表
-            </button>
-          </div>
-        )}
+    <div className="p-4 md:p-6 max-w-2xl mx-auto">
+      {/* Header */}
+      <div className="mb-5">
+        <h1 className="text-xl font-semibold text-[#1c1c1c]">排班管理</h1>
+        <p className="text-sm text-[#8a7a6e] mt-0.5">
+          {isStaff ? "管理自己的出勤事件" : "查看與管理員工排班"}
+        </p>
       </div>
 
-      {/* 25th rule banner */}
-      {show25Banner && !isStaff && (
-        <div className={`mb-4 px-4 py-3 rounded-xl text-sm border ${
-          isPast25
-            ? "bg-amber-50 border-amber-300 text-amber-800"
-            : "bg-yellow-50 border-yellow-300 text-yellow-800"
-        }`}>
-          {isPast25
-            ? "今日已到25號，請確認後兩個月班表已開放"
-            : "提醒：本月25日開放後兩個月班表，請提前設定好排班"}
+      {/* 25th rule notice */}
+      {!canEditNextMonths && (
+        <div className="mb-4 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+          每月 <strong>20 號</strong>起開放填寫未來兩個月班表。目前只能修改本月。
+        </div>
+      )}
+      {canEditNextMonths && (
+        <div className="mb-4 px-4 py-3 rounded-xl bg-green-50 border border-green-200 text-green-800 text-sm">
+          可填寫 <strong>{editableMonths.map(m => m.replace("-", "年") + "月").join("、")}</strong> 的班表。（25號後客人才看得到新班表）
         </div>
       )}
 
-      {/* Copy success toast */}
-      {copySuccess && (
-        <div className="mb-4 px-4 py-3 rounded-xl text-sm border bg-green-50 border-green-300 text-green-800">
-          已成功複製班表至下個月！
-        </div>
-      )}
-
-      {/* Store tabs */}
-      {!isStaff && (
-        <div className="flex gap-2 mb-4">
-          {ADMIN_STORES.map(store => (
-            <button
-              key={store.id}
-              onClick={() => { setSelectedStoreId(store.id); setOpenStaffPanel(null); }}
-              className={`px-4 py-2 rounded-xl text-sm border transition-colors ${
-                selectedStoreId === store.id
-                  ? "bg-[#8b6748] text-white border-[#8b6748]"
-                  : "bg-white text-[#1c1c1c] border-[#e8ddd2] hover:bg-[#faf7f2]"
-              }`}
-            >
-              {store.name}
+      {/* Branch + Staff selector (admin/manager only) */}
+      {isAdmin && (
+        <div className="flex gap-2 mb-4 flex-wrap">
+          {BRANCHES.map(b => (
+            <button key={b.id} onClick={() => { setSelectedBranch(b.id); setSelectedStaffId(""); }}
+              className={`px-3 py-1.5 rounded-xl text-sm border transition-colors ${
+                selectedBranch === b.id ? "bg-[#8b6748] text-white border-[#8b6748]" : "bg-white text-[#8a7a6e] border-[#e8ddd2]"
+              }`}>
+              {b.name}
             </button>
           ))}
         </div>
       )}
 
-      {/* Week navigation + day selector */}
-      <div className="bg-white rounded-2xl border border-[#e8ddd2] p-3 mb-4">
-        <div className="flex items-center justify-between mb-3">
-          <button
-            onClick={() => setWeekOffset(o => Math.max(0, o - 1))}
-            disabled={weekOffset === 0}
-            className="px-3 py-1.5 rounded-lg border border-[#e8ddd2] text-[#8a7a6e] text-sm disabled:opacity-30"
-          >
-            ‹ 上週
+      {isAdmin && staffList.length > 0 && (
+        <div className="flex gap-2 mb-4 flex-wrap">
+          <button onClick={() => setSelectedStaffId("")}
+            className={`px-3 py-1.5 rounded-xl text-sm border transition-colors ${
+              !selectedStaffId ? "bg-[#8b6748] text-white border-[#8b6748]" : "bg-white text-[#8a7a6e] border-[#e8ddd2]"
+            }`}>
+            全部
           </button>
-          <span className="text-sm font-medium text-[#1c1c1c]">
-            {weekDays[0].getMonth() + 1}/{weekDays[0].getDate()} – {weekDays[6].getMonth() + 1}/{weekDays[6].getDate()}
-          </span>
-          <button
-            onClick={() => setWeekOffset(o => Math.min(8, o + 1))}
-            className="px-3 py-1.5 rounded-lg border border-[#e8ddd2] text-[#8a7a6e] text-sm"
-          >
-            下週 ›
-          </button>
+          {staffList.map(s => (
+            <button key={s.id} onClick={() => setSelectedStaffId(s.id)}
+              className={`px-3 py-1.5 rounded-xl text-sm border transition-colors ${
+                selectedStaffId === s.id ? "bg-[#8b6748] text-white border-[#8b6748]" : "bg-white text-[#8a7a6e] border-[#e8ddd2]"
+              }`}>
+              {s.name}
+            </button>
+          ))}
         </div>
-        <div className="grid grid-cols-7 gap-1">
-          {weekDays.map((d, i) => {
-            const dStr = formatDate(d);
-            const isPast = d < today && dStr !== formatDate(today);
-            const isSelected = dStr === dateStr;
-            const cnt = ADMIN_BOOKINGS.filter(b => b.date === dStr && (isStaff ? b.staffId === myStaff?.id : storeStaff.some(s => s.id === b.staffId))).length;
+      )}
+
+      {/* Month navigator */}
+      <div className="flex items-center justify-between mb-4 bg-white rounded-2xl border border-[#e8ddd2] px-5 py-3">
+        <button onClick={prevMonth} className="text-[#8b6748] text-lg px-2">‹</button>
+        <div className="text-center">
+          <div className="text-base font-semibold text-[#1c1c1c]">
+            {viewYear} 年 {viewMonth + 1} 月
+          </div>
+          {currentStaffName && (
+            <div className="text-xs text-[#8a7a6e] mt-0.5">{currentStaffName}</div>
+          )}
+        </div>
+        <button onClick={nextMonth} className="text-[#8b6748] text-lg px-2">›</button>
+      </div>
+
+      {/* Calendar */}
+      <div className="bg-white rounded-2xl border border-[#e8ddd2] overflow-hidden">
+        {/* Day name headers */}
+        <div className="grid grid-cols-7 border-b border-[#f0e8df]">
+          {DAY_NAMES.map((d, i) => (
+            <div key={d} className={`text-center text-xs py-2 font-medium ${
+              i === 0 ? "text-red-400" : i === 6 ? "text-blue-400" : "text-[#8a7a6e]"
+            }`}>{d}</div>
+          ))}
+        </div>
+
+        {/* Calendar grid */}
+        <div className="grid grid-cols-7">
+          {/* Empty cells for first week */}
+          {Array.from({ length: firstDayOfWeek }).map((_, i) => (
+            <div key={`empty-${i}`} className="min-h-[80px] border-b border-r border-[#f0e8df] bg-[#faf7f2]/50" />
+          ))}
+
+          {days.map((day, idx) => {
+            const ymd = toYMD(day);
+            const isToday = ymd === todayYMD;
+            const isPast = ymd < todayYMD;
+            const dayEvents = eventsOnDate(ymd);
+            const colIdx = (firstDayOfWeek + idx) % 7;
+            const isLastCol = colIdx === 6;
+            const isLastRow = idx >= days.length - 7;
+            const canClick = !isPast && isEditable;
+
             return (
-              <button
-                key={dStr}
-                onClick={() => setSelectedDate(d)}
-                className={`flex flex-col items-center py-2 rounded-xl text-xs transition-colors ${
-                  isSelected
-                    ? "bg-[#8b6748] text-white"
-                    : isPast
-                    ? "opacity-40 hover:bg-[#faf7f2]"
-                    : "hover:bg-[#faf7f2]"
-                }`}
+              <div
+                key={ymd}
+                onClick={() => canClick && openAdd(ymd)}
+                className={`min-h-[80px] p-1.5 border-b border-r border-[#f0e8df] transition-colors
+                  ${isLastCol ? "border-r-0" : ""}
+                  ${isLastRow ? "border-b-0" : ""}
+                  ${isPast ? "bg-[#faf7f2]/30" : canClick ? "hover:bg-[#faf7f2] cursor-pointer" : ""}
+                `}
               >
-                <span className="text-[10px] mb-0.5">{DAY_NAMES[i]}</span>
-                <span className="font-medium">{d.getDate()}</span>
-                {cnt > 0 && (
-                  <span className={`text-[9px] mt-0.5 ${isSelected ? "text-white/70" : "text-[#8b6748]"}`}>
-                    {cnt}件
-                  </span>
-                )}
-              </button>
+                {/* Date number */}
+                <div className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full ${
+                  isToday ? "bg-[#8b6748] text-white" :
+                  colIdx === 0 ? "text-red-400" :
+                  colIdx === 6 ? "text-blue-400" :
+                  "text-[#1c1c1c]"
+                }`}>
+                  {day.getDate()}
+                </div>
+
+                {/* Events */}
+                <div className="space-y-0.5">
+                  {dayEvents.map(e => (
+                    <div
+                      key={e.id}
+                      onClick={ev => { ev.stopPropagation(); openEdit(e); }}
+                      className={`text-[10px] px-1.5 py-0.5 rounded-md border font-medium cursor-pointer truncate ${EVENT_COLORS[e.event_type]}`}
+                    >
+                      {e.event_type === "自訂" && e.custom_label ? e.custom_label : e.event_type}
+                      {e.start_time && <span className="opacity-70 ml-1">{e.start_time}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
             );
           })}
         </div>
       </div>
 
-      {/* Staff panel toggle (排班管理) for selected staff */}
-      {openStaffPanel && (
-        <div className="bg-white rounded-2xl border border-[#8b6748]/30 p-4 mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-medium text-[#1c1c1c]">
-              {storeStaff.find(s => s.id === openStaffPanel)?.name} · 排班設定
-            </h3>
-            <button
-              onClick={() => setOpenStaffPanel(null)}
-              className="text-xs text-[#8a7a6e] hover:text-[#1c1c1c]"
-            >
-              關閉 ✕
-            </button>
-          </div>
-          <p className="text-xs text-[#8a7a6e] mb-3">{dateStr} · 點擊時段切換開關</p>
-          <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
-            {TIME_SLOTS.map(time => {
-              const key = getSlotKey(openStaffPanel, time);
-              const booked = dayBookingsForStore.some(b => b.staffId === openStaffPanel && b.time === time);
-              const isOpen = openSlots[key] ?? true;
-              return (
-                <button
-                  key={time}
-                  onClick={() => !booked && toggleSlot(openStaffPanel, time)}
-                  disabled={booked}
-                  className={`py-1.5 px-1 rounded-lg text-[11px] text-center border transition-colors ${
-                    booked
-                      ? "bg-[#8b6748] text-white border-[#8b6748] cursor-default"
-                      : isOpen
-                      ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
-                      : "bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200"
-                  }`}
-                >
-                  {time}
-                  <div className="text-[9px] mt-0.5">
-                    {booked ? "已預約" : isOpen ? "開放" : "關閉"}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-          {/* Buffer setting for staff role */}
-          {isStaff && myStaff && (
-            <div className="mt-4 pt-3 border-t border-[#e8ddd2] flex items-center gap-3">
-              <span className="text-sm text-[#8a7a6e]">每次預約後緩衝</span>
-              <select
-                value={bufferMap[myStaff.id] ?? 5}
-                onChange={e => setBufferMap(prev => ({ ...prev, [myStaff.id]: Number(e.target.value) }))}
-                className="px-3 py-1.5 border border-[#e8ddd2] rounded-lg text-sm focus:outline-none focus:border-[#8b6748]"
-              >
-                {[0, 5, 10, 15, 20, 25, 30].map(v => (
-                  <option key={v} value={v}>{v} 分鐘</option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Calendar grid: time axis + staff columns */}
-      <div className="bg-white rounded-2xl border border-[#e8ddd2] overflow-hidden">
-        <div className="overflow-x-auto">
-          <div
-            className="flex"
-            style={{ minWidth: `${64 + storeStaff.length * 140}px` }}
-          >
-            {/* Time axis column */}
-            <div className="flex-shrink-0 w-16 border-r border-[#e8ddd2]">
-              {/* Header spacer */}
-              <div style={{ height: HEADER_HEIGHT }} className="border-b border-[#e8ddd2]" />
-              {TIME_SLOTS.map(time => (
-                <div
-                  key={time}
-                  style={{ height: ROW_HEIGHT }}
-                  className="flex items-start px-2 pt-1 border-b border-[#f0ebe4]"
-                >
-                  <span className="text-[11px] text-[#8a7a6e] leading-none">{time}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Staff columns */}
-            {storeStaff.map(staff => {
-              const bookingCnt = staffBookingCount(staff.id);
-              const staffBookings = dayBookingsForStore.filter(b => b.staffId === staff.id);
-
-              return (
-                <div
-                  key={staff.id}
-                  className="flex-shrink-0 border-r border-[#e8ddd2] last:border-r-0"
-                  style={{ width: 140 }}
-                >
-                  {/* Staff column header */}
-                  <button
-                    onClick={() => setOpenStaffPanel(openStaffPanel === staff.id ? null : staff.id)}
-                    style={{ height: HEADER_HEIGHT }}
-                    className={`w-full flex flex-col items-center justify-center border-b border-[#e8ddd2] px-2 transition-colors hover:bg-[#faf7f2] ${
-                      openStaffPanel === staff.id ? "bg-[#faf7f2]" : "bg-white"
-                    }`}
-                  >
-                    <span className="text-sm font-medium text-[#1c1c1c] leading-tight">{staff.name}</span>
-                    <span className="text-[10px] text-[#8a7a6e] leading-tight">{staff.displayLevel}</span>
-                    <span className="text-[10px] text-[#8b6748] mt-0.5">
-                      {bookingCnt} 件 ▾
-                    </span>
-                  </button>
-
-                  {/* Column body: time slot grid + booking cards */}
-                  <div className="relative" style={{ height: TIME_SLOTS.length * ROW_HEIGHT }}>
-                    {/* Background time slot rows */}
-                    {TIME_SLOTS.map(time => {
-                      const key = getSlotKey(staff.id, time);
-                      const isOpen = openSlots[key] ?? true;
-                      return (
-                        <div
-                          key={time}
-                          style={{ height: ROW_HEIGHT }}
-                          className={`border-b border-[#f0ebe4] ${!isOpen ? "" : ""}`}
-                        >
-                          {!isOpen && (
-                            <div
-                              className="w-full h-full"
-                              style={{
-                                background: "repeating-linear-gradient(135deg, #e8e8f0 0px, #e8e8f0 2px, #f4f4f8 2px, #f4f4f8 8px)",
-                                opacity: 0.6,
-                              }}
-                            />
-                          )}
-                        </div>
-                      );
-                    })}
-
-                    {/* Booking cards positioned absolutely */}
-                    {staffBookings.map(b => {
-                      const style = bookingStyle(b.time, b.duration);
-                      const serviceCode = SERVICE_CODES[b.serviceId] || b.serviceId;
-                      const endMin = timeToMinutes(b.time) + b.duration;
-                      const endH = Math.floor(endMin / 60) + 10;
-                      const endM = endMin % 60;
-                      const endStr = `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
-                      return (
-                        <div
-                          key={b.id}
-                          style={{
-                            position: "absolute",
-                            top: style.top - HEADER_HEIGHT,
-                            height: style.height,
-                            left: 4,
-                            right: 4,
-                          }}
-                          className="rounded-lg bg-rose-50 border border-rose-200 px-2 py-1 overflow-hidden shadow-sm"
-                        >
-                          <div className="text-[10px] text-rose-400 leading-none mb-0.5">
-                            {b.time}–{endStr}
-                          </div>
-                          <div className="text-[11px] font-medium text-rose-800 leading-tight truncate">
-                            {b.customerName}
-                          </div>
-                          <div className="mt-0.5 flex items-center gap-1 flex-wrap">
-                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-rose-200 text-rose-700 leading-none">
-                              【{serviceCode}】
-                            </span>
-                            {b.status === "已確認" && (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 leading-none">確認</span>
-                            )}
-                            {b.status === "待確認" && (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600 leading-none">待確認</span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+      {/* Legend */}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {EVENT_TYPES.map(t => (
+          <span key={t} className={`text-[10px] px-2 py-0.5 rounded-full border ${EVENT_COLORS[t]}`}>{t}</span>
+        ))}
       </div>
-
-      {/* Staff role: buffer setting */}
-      {isStaff && myStaff && !openStaffPanel && (
-        <div className="bg-white rounded-2xl border border-[#e8ddd2] p-4 mt-4">
-          <h3 className="text-sm font-medium text-[#1c1c1c] mb-3">預設緩衝時間設定</h3>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-[#8a7a6e]">每次預約後緩衝</span>
-            <select
-              value={bufferMap[myStaff.id] ?? 5}
-              onChange={e => setBufferMap(prev => ({ ...prev, [myStaff.id]: Number(e.target.value) }))}
-              className="px-3 py-1.5 border border-[#e8ddd2] rounded-lg text-sm focus:outline-none focus:border-[#8b6748]"
-            >
-              {[0, 5, 10, 15, 20, 25, 30].map(v => (
-                <option key={v} value={v}>{v} 分鐘</option>
-              ))}
-            </select>
-          </div>
-        </div>
+      {!isEditable && (
+        <p className="text-xs text-[#8a7a6e] mt-2 text-center">此月份不在可編輯範圍內</p>
       )}
 
-      {/* Copy schedule modal */}
-      {showCopyModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
-            <h3 className="text-base font-semibold text-[#1c1c1c] mb-2">複製班表</h3>
-            <p className="text-sm text-[#8a7a6e] mb-6">
-              確定要將本月班表複製到下個月嗎？現有下月設定將被覆蓋。
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowCopyModal(false)}
-                className="flex-1 py-2.5 rounded-xl text-sm border border-[#e8ddd2] text-[#8a7a6e] hover:bg-[#faf7f2]"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleCopySchedule}
-                className="flex-1 py-2.5 rounded-xl text-sm bg-[#8b6748] text-white hover:bg-[#7a5a3e]"
-              >
-                確認複製
+      {/* Add/Edit Modal */}
+      {modalDate && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="text-base font-medium text-[#1c1c1c] mb-1">
+              {modalEvent ? "編輯事件" : "新增事件"}
+            </h3>
+            <p className="text-sm text-[#8a7a6e] mb-4">{modalDate.replace(/-/g, "/")}</p>
+
+            <div className="space-y-3">
+              {/* Event type */}
+              <div>
+                <label className="text-xs text-[#8a7a6e] mb-1.5 block">事件類型</label>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {EVENT_TYPES.map(t => (
+                    <button key={t} onClick={() => setForm(p => ({ ...p, event_type: t }))}
+                      className={`py-1.5 rounded-xl text-xs font-medium border transition-colors ${
+                        form.event_type === t
+                          ? "bg-[#8b6748] text-white border-[#8b6748]"
+                          : "bg-white text-[#8a7a6e] border-[#e8ddd2] hover:border-[#8b6748]"
+                      }`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom label */}
+              {form.event_type === "自訂" && (
+                <div>
+                  <label className="text-xs text-[#8a7a6e] mb-1 block">自訂說明</label>
+                  <input value={form.custom_label}
+                    onChange={e => setForm(p => ({ ...p, custom_label: e.target.value }))}
+                    placeholder="例：外部培訓、品牌活動…"
+                    className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]" />
+                </div>
+              )}
+
+              {/* Time range */}
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-xs text-[#8a7a6e] mb-1 block">開始時間</label>
+                  <input type="time" value={form.start_time}
+                    onChange={e => setForm(p => ({ ...p, start_time: e.target.value }))}
+                    className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]" />
+                </div>
+                <div className="flex-1">
+                  <label className="text-xs text-[#8a7a6e] mb-1 block">結束時間</label>
+                  <input type="time" value={form.end_time}
+                    onChange={e => setForm(p => ({ ...p, end_time: e.target.value }))}
+                    className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]" />
+                </div>
+              </div>
+
+              {/* Blocks booking toggle */}
+              <label className="flex items-center justify-between py-2 cursor-pointer">
+                <div>
+                  <div className="text-sm text-[#1c1c1c] font-medium">封鎖客人預約</div>
+                  <div className="text-xs text-[#8a7a6e]">開啟後此時段不開放線上預約</div>
+                </div>
+                <div onClick={() => setForm(p => ({ ...p, blocks_booking: !p.blocks_booking }))}
+                  className={`w-11 h-6 rounded-full transition-colors relative ${form.blocks_booking ? "bg-[#8b6748]" : "bg-gray-200"}`}>
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.blocks_booking ? "translate-x-6" : "translate-x-1"}`} />
+                </div>
+              </label>
+            </div>
+
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setModalDate(null)} className="flex-1 py-2.5 border border-[#e8ddd2] rounded-xl text-sm text-[#8a7a6e]">取消</button>
+              {modalEvent && (
+                <button onClick={handleDelete} disabled={saving} className="py-2.5 px-4 border border-red-200 text-red-500 rounded-xl text-sm">刪除</button>
+              )}
+              <button onClick={handleSave} disabled={saving} className="flex-1 py-2.5 bg-[#8b6748] text-white rounded-xl text-sm disabled:opacity-50">
+                {saving ? "儲存中…" : "儲存"}
               </button>
             </div>
           </div>

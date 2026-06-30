@@ -29,9 +29,9 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   }
 
   const role = user.role;
-  const isAdmin = role === "管理者";
+  const isAdmin = role === "管理者" || role === "會計";
   const isManager = role === "店長";
-  const isAccountant = role === "會計";
+  const isAccountant = false; // 會計現在等同管理者權限
 
   const navItems = [
     { href: "/admin/dashboard", label: "首頁", icon: "⊞" },
