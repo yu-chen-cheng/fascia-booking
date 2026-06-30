@@ -407,7 +407,7 @@ export default function StaffPage() {
               <Field label="角色">
                 <select value={editStaff.role} onChange={e => setEditStaff(p => p && ({ ...p, role: e.target.value as Role }))}
                   className={inputCls}>
-                  {["員工","店長","管理者"].map(r => <option key={r}>{r}</option>)}
+                  {["員工","店長","管理者","會計"].map(r => <option key={r}>{r}</option>)}
                 </select>
               </Field>
               <Field label="所屬分店">
@@ -496,7 +496,7 @@ export default function StaffPage() {
               <Field label="角色">
                 <select value={newStaff.role} onChange={e => setNewStaff(p => ({ ...p, role: e.target.value as Role }))}
                   className={inputCls}>
-                  {["員工","店長","管理者"].map(r => <option key={r}>{r}</option>)}
+                  {["員工","店長","管理者","會計"].map(r => <option key={r}>{r}</option>)}
                 </select>
               </Field>
               <Field label="所屬分店">

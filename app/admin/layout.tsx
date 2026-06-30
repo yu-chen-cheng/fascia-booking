@@ -31,25 +31,30 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const role = user.role;
   const isAdmin = role === "管理者";
   const isManager = role === "店長";
+  const isAccountant = role === "會計";
 
   const navItems = [
     { href: "/admin/dashboard", label: "首頁", icon: "⊞" },
-    { href: "/admin/schedule", label: "排班", icon: "⊡" },
-    { href: "/admin/bookings", label: "預約", icon: "⊟" },
+    ...(!(isAccountant) ? [
+      { href: "/admin/schedule", label: "排班", icon: "⊡" },
+      { href: "/admin/bookings", label: "預約", icon: "⊟" },
+    ] : []),
     ...(isAdmin || isManager ? [{ href: "/admin/customers", label: "會員", icon: "◉" }] : []),
-    { href: "/admin/notifications", label: "通知", icon: "◈", hidden: !(isAdmin || isManager) },
-    ...(isAdmin || isManager ? [
+    ...(isAdmin || isManager ? [{ href: "/admin/notifications", label: "通知", icon: "◈" }] : []),
+    ...(isAdmin || isManager || isAccountant ? [
       { href: "/admin/cashout", label: "結帳", icon: "💴" },
+      { href: "/admin/reports", label: "報表", icon: "▦" },
+      { href: "/admin/expenses", label: "費用", icon: "₩" },
+    ] : []),
+    ...(isAdmin || isManager ? [
       { href: "/admin/attendance", label: "打卡", icon: "⏱" },
     ] : []),
     ...(isAdmin ? [
       { href: "/admin/staff", label: "員工", icon: "◎" },
       { href: "/admin/services", label: "服務", icon: "◇" },
-      { href: "/admin/reports", label: "報表", icon: "▦" },
-      { href: "/admin/expenses", label: "費用", icon: "₩" },
       { href: "/admin/inventory", label: "貨物", icon: "◻" },
     ] : []),
-  ].filter(item => !item.hidden);
+  ];
 
   const settingsItems = isAdmin ? [
     { href: "/admin/cashout", label: "每日結帳" },
@@ -63,7 +68,13 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   ] : isManager ? [
     { href: "/admin/cashout", label: "每日結帳" },
     { href: "/admin/attendance", label: "打卡薪資" },
+    { href: "/admin/reports", label: "業績報表" },
+    { href: "/admin/expenses", label: "費用管理" },
     { href: "/admin/notifications", label: "通知設定" },
+  ] : isAccountant ? [
+    { href: "/admin/cashout", label: "每日結帳" },
+    { href: "/admin/reports", label: "業績報表" },
+    { href: "/admin/expenses", label: "費用管理" },
   ] : [];
 
   return (
