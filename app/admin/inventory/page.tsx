@@ -135,10 +135,69 @@ export default function InventoryPage() {
     setCountSubmitted(true);
   };
 
-  const sendLowStockEmail = () => {
-    // In production: call API to send email
-    setEmailSent(true);
-    setTimeout(() => setEmailSent(false), 3000);
+  const sendLowStockEmail = async () => {
+    const lowItems = products.filter(p =>
+      p.stockST01 < p.lowStockThreshold ||
+      p.stockST02 < p.lowStockThreshold ||
+      p.stockST03 < p.lowStockThreshold
+    );
+    if (lowItems.length === 0) return;
+
+    const rows = lowItems.map(p => `
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;">${p.name}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;${p.stockST01 < p.lowStockThreshold ? "color:#dc2626;font-weight:bold;" : ""}">${p.stockST01}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;${p.stockST02 < p.lowStockThreshold ? "color:#dc2626;font-weight:bold;" : ""}">${p.stockST02}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;${p.stockST03 < p.lowStockThreshold ? "color:#dc2626;font-weight:bold;" : ""}">${p.stockST03}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;">${p.lowStockThreshold}</td>
+      </tr>
+    `).join("");
+
+    const today = new Date().toLocaleDateString("zh-TW", { year: "numeric", month: "long", day: "numeric" });
+
+    const html = `
+      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+        <div style="background:#8b6748;padding:20px 24px;border-radius:8px 8px 0 0;">
+          <h2 style="color:#fff;margin:0;font-size:18px;">FASCIA 法夏・庫存警示通知</h2>
+          <p style="color:#d4b896;margin:4px 0 0;font-size:13px;">${today}</p>
+        </div>
+        <div style="background:#faf7f2;padding:20px 24px;">
+          <p style="color:#1c1c1c;font-size:14px;">以下商品庫存已低於安全警戒數量，請安排補貨：</p>
+          <table style="width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;margin-top:12px;">
+            <thead>
+              <tr style="background:#f5f0e8;">
+                <th style="padding:10px 12px;text-align:left;font-size:13px;color:#8b6748;">商品名稱</th>
+                <th style="padding:10px 12px;text-align:center;font-size:13px;color:#8b6748;">小巨蛋</th>
+                <th style="padding:10px 12px;text-align:center;font-size:13px;color:#8b6748;">大安</th>
+                <th style="padding:10px 12px;text-align:center;font-size:13px;color:#8b6748;">板橋</th>
+                <th style="padding:10px 12px;text-align:center;font-size:13px;color:#8b6748;">警戒線</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <p style="color:#8a7a6e;font-size:12px;margin-top:16px;">紅色數字表示該門市庫存已低於警戒線。</p>
+        </div>
+        <div style="background:#f5f0e8;padding:12px 24px;border-radius:0 0 8px 8px;text-align:center;">
+          <p style="color:#8a7a6e;font-size:12px;margin:0;">此為系統自動發送通知 · FASCIA 法夏筋膜結構美學</p>
+        </div>
+      </div>
+    `;
+
+    try {
+      await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: accountantEmail,
+          subject: `【法夏庫存警示】${lowItems.length} 項商品需補貨 · ${today}`,
+          html,
+        }),
+      });
+      setEmailSent(true);
+      setTimeout(() => setEmailSent(false), 4000);
+    } catch (e) {
+      console.error("sendLowStockEmail error", e);
+    }
   };
 
   const submitTransfer = () => {
