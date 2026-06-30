@@ -13,7 +13,7 @@ const BRAND_COLORS: Record<ProductBrand, string> = {
 
 const BRAND_LIST: ProductBrand[] = ["法夏嚴選", "Sissel", "黃金甲"];
 
-type StoreId = "ST01" | "ST02";
+type StoreId = "ST01" | "ST02" | "ST03";
 type TabType = "庫存清單" | "盤點" | "調撥";
 
 interface TransferRequest {
@@ -44,6 +44,7 @@ export default function InventoryPage() {
 
   // 盤點 tab
   const [countStore, setCountStore] = useState<StoreId>("ST01");
+  const STORE_IDS: StoreId[] = ["ST01", "ST02", "ST03"];
   const [actualCounts, setActualCounts] = useState<Record<string, number>>({});
   const [countSubmitted, setCountSubmitted] = useState(false);
   const [accountantEmail, setAccountantEmail] = useState("accountant@fascia.tw");
@@ -91,12 +92,14 @@ export default function InventoryPage() {
   });
 
   const getStock = (p: InventoryProduct, store: StoreId | "all") => {
-    if (store === "all") return p.stockST01 + p.stockST02;
-    return store === "ST01" ? p.stockST01 : p.stockST02;
+    if (store === "all") return p.stockST01 + p.stockST02 + p.stockST03;
+    if (store === "ST01") return p.stockST01;
+    if (store === "ST02") return p.stockST02;
+    return p.stockST03;
   };
 
   const isLow = (p: InventoryProduct, store: StoreId | "all") => {
-    if (store === "all") return p.stockST01 < p.lowStockThreshold || p.stockST02 < p.lowStockThreshold;
+    if (store === "all") return p.stockST01 < p.lowStockThreshold || p.stockST02 < p.lowStockThreshold || p.stockST03 < p.lowStockThreshold;
     return getStock(p, store) < p.lowStockThreshold;
   };
 
@@ -109,7 +112,8 @@ export default function InventoryPage() {
     setProducts(prev => prev.map(p => {
       if (p.id !== adjustTarget.product.id) return p;
       if (adjustTarget.store === "ST01") return { ...p, stockST01: Math.max(0, p.stockST01 + adjustQty) };
-      return { ...p, stockST02: Math.max(0, p.stockST02 + adjustQty) };
+      if (adjustTarget.store === "ST02") return { ...p, stockST02: Math.max(0, p.stockST02 + adjustQty) };
+      return { ...p, stockST03: Math.max(0, p.stockST03 + adjustQty) };
     }));
     setAdjustTarget(null);
     setAdjustQty(0);
@@ -123,7 +127,8 @@ export default function InventoryPage() {
       if (actualCounts[key] !== undefined) {
         const newQty = actualCounts[key];
         if (countStore === "ST01") return { ...p, stockST01: newQty };
-        return { ...p, stockST02: newQty };
+        if (countStore === "ST02") return { ...p, stockST02: newQty };
+        return { ...p, stockST03: newQty };
       }
       return p;
     }));
@@ -157,13 +162,16 @@ export default function InventoryPage() {
   const completeTransfer = (tid: string) => {
     const t = transfers.find(x => x.id === tid);
     if (!t) return;
-    // Update stock
     setProducts(prev => prev.map(p => {
       if (p.id !== t.productId) return p;
-      const fromST01 = t.fromStore === "ST01";
-      const newST01 = fromST01 ? Math.max(0, p.stockST01 - t.qty) : p.stockST01 + t.qty;
-      const newST02 = fromST01 ? p.stockST02 + t.qty : Math.max(0, p.stockST02 - t.qty);
-      return { ...p, stockST01: newST01, stockST02: newST02 };
+      const delta = (store: StoreId) =>
+        store === t.fromStore ? -t.qty : store === t.toStore ? t.qty : 0;
+      return {
+        ...p,
+        stockST01: Math.max(0, p.stockST01 + delta("ST01")),
+        stockST02: Math.max(0, p.stockST02 + delta("ST02")),
+        stockST03: Math.max(0, p.stockST03 + delta("ST03")),
+      };
     }));
     setTransfers(prev => prev.map(x => x.id === tid ? { ...x, status: "已完成" } : x));
   };
@@ -231,7 +239,7 @@ export default function InventoryPage() {
                     <span>{p.name}</span>
                     <span>
                       {selectedStore === "all"
-                        ? `小巨蛋:${p.stockST01} / 大安:${p.stockST02}`
+                        ? `小巨蛋:${p.stockST01} / 大安:${p.stockST02} / 板橋:${p.stockST03}`
                         : `${getStock(p, selectedStore)} ${p.unit}`}（警戒：{p.lowStockThreshold}）
                     </span>
                   </div>
@@ -277,6 +285,7 @@ export default function InventoryPage() {
                 <option value="all">全部門市</option>
                 <option value="ST01">小巨蛋店</option>
                 <option value="ST02">大安店</option>
+                <option value="ST03">板橋店</option>
               </select>
               <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="搜尋商品名稱…"
                 className="flex-1 px-3 py-2 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]" />
@@ -307,6 +316,7 @@ export default function InventoryPage() {
                         <div className="text-xs space-y-0.5">
                           <div className={`font-medium ${p.stockST01 < p.lowStockThreshold ? "text-red-600" : "text-[#1c1c1c]"}`}>小巨蛋：{p.stockST01} {p.unit}</div>
                           <div className={`font-medium ${p.stockST02 < p.lowStockThreshold ? "text-red-600" : "text-[#1c1c1c]"}`}>大安：{p.stockST02} {p.unit}</div>
+                          <div className={`font-medium ${p.stockST03 < p.lowStockThreshold ? "text-red-600" : "text-[#1c1c1c]"}`}>板橋：{p.stockST03} {p.unit}</div>
                           <div className="text-[#8a7a6e]">合計：{totalStock} {p.unit}</div>
                         </div>
                       ) : (
@@ -325,11 +335,13 @@ export default function InventoryPage() {
                         className="px-3 py-1.5 bg-[#faf7f2] text-[#8b6748] border border-[#e8ddd2] rounded-lg text-xs font-medium">− 出庫</button>
                     </div>
                   ) : (
-                    <div className="flex gap-2 mt-3">
+                    <div className="flex gap-2 mt-3 flex-wrap">
                       <button onClick={() => { setAdjustTarget({ product: p, store: "ST01" }); setAdjustQty(1); }}
                         className="px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-lg text-xs">小巨蛋 入庫</button>
                       <button onClick={() => { setAdjustTarget({ product: p, store: "ST02" }); setAdjustQty(1); }}
                         className="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs">大安 入庫</button>
+                      <button onClick={() => { setAdjustTarget({ product: p, store: "ST03" }); setAdjustQty(1); }}
+                        className="px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-xs">板橋 入庫</button>
                     </div>
                   )}
                 </div>
@@ -345,7 +357,7 @@ export default function InventoryPage() {
         <div>
           {/* Store selector */}
           <div className="flex gap-2 mb-4">
-            {(["ST01", "ST02"] as StoreId[]).map(sid => (
+            {(["ST01", "ST02", "ST03"] as StoreId[]).map(sid => (
               <button key={sid} onClick={() => { setCountStore(sid); setCountSubmitted(false); setActualCounts({}); }}
                 className={`px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
                   countStore === sid ? "bg-[#8b6748] text-white border-[#8b6748]" : "bg-white text-[#8a7a6e] border-[#e8ddd2]"
@@ -529,7 +541,7 @@ export default function InventoryPage() {
             <div className="mb-4">
               <div className="text-xs text-[#8a7a6e] mb-1">目前庫存</div>
               <div className="text-2xl font-semibold text-[#1c1c1c] mb-3">
-                {adjustTarget.store === "ST01" ? adjustTarget.product.stockST01 : adjustTarget.product.stockST02} {adjustTarget.product.unit}
+                {adjustTarget.store === "ST01" ? adjustTarget.product.stockST01 : adjustTarget.store === "ST02" ? adjustTarget.product.stockST02 : adjustTarget.product.stockST03} {adjustTarget.product.unit}
               </div>
               <label className="text-sm font-medium text-[#1c1c1c] mb-2 block">調整數量（正數＝入庫，負數＝出庫）</label>
               <div className="flex items-center gap-3">
@@ -543,7 +555,7 @@ export default function InventoryPage() {
               {adjustQty !== 0 && (
                 <div className="mt-2 text-sm text-center text-[#8a7a6e]">
                   調整後：<span className="font-semibold text-[#1c1c1c] ml-1">
-                    {Math.max(0, (adjustTarget.store === "ST01" ? adjustTarget.product.stockST01 : adjustTarget.product.stockST02) + adjustQty)} {adjustTarget.product.unit}
+                    {Math.max(0, (adjustTarget.store === "ST01" ? adjustTarget.product.stockST01 : adjustTarget.store === "ST02" ? adjustTarget.product.stockST02 : adjustTarget.product.stockST03) + adjustQty)} {adjustTarget.product.unit}
                   </span>
                 </div>
               )}
@@ -584,14 +596,16 @@ export default function InventoryPage() {
                     className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]">
                     <option value="ST01">小巨蛋店</option>
                     <option value="ST02">大安店</option>
+                    <option value="ST03">板橋店</option>
                   </select>
                 </div>
                 <div>
                   <label className="text-xs text-[#8a7a6e] mb-1 block">到（收貨門市）</label>
                   <select value={newTransfer.toStore} onChange={e => setNewTransfer(p => ({ ...p, toStore: e.target.value as StoreId }))}
                     className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]">
-                    <option value="ST02">大安店</option>
                     <option value="ST01">小巨蛋店</option>
+                    <option value="ST02">大安店</option>
+                    <option value="ST03">板橋店</option>
                   </select>
                 </div>
               </div>

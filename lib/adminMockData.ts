@@ -187,6 +187,7 @@ export interface InventoryProduct {
   cost: number;            // 成本（選填，管理者才能看）
   stockST01: number;       // 小巨蛋店庫存
   stockST02: number;       // 大安店庫存
+  stockST03: number;       // 板橋店庫存
   lowStockThreshold: number; // 低庫存警戒數量
   unit: string;            // 單位，e.g. "個", "瓶", "包"
   enabled: boolean;        // 是否上架銷售
@@ -194,42 +195,42 @@ export interface InventoryProduct {
 
 export const INVENTORY_PRODUCTS: InventoryProduct[] = [
   // 法夏嚴選（13項）
-  { id: "F001", name: "Fascia四寶（含工具包）", brand: "法夏嚴選", price: 3800, cost: 1200, stockST01: 5, stockST02: 3, lowStockThreshold: 3, unit: "組", enabled: true },
-  { id: "F002", name: "結締筆", brand: "法夏嚴選", price: 950, cost: 280, stockST01: 12, stockST02: 8, lowStockThreshold: 5, unit: "支", enabled: true },
-  { id: "F003", name: "鳥嘴筋膜刀", brand: "法夏嚴選", price: 1650, cost: 500, stockST01: 7, stockST02: 4, lowStockThreshold: 3, unit: "把", enabled: true },
-  { id: "F004", name: "消波塊", brand: "法夏嚴選", price: 1000, cost: 300, stockST01: 2, stockST02: 1, lowStockThreshold: 3, unit: "個", enabled: true },
-  { id: "F005", name: "筋膜球（大）", brand: "法夏嚴選", price: 720, cost: 180, stockST01: 15, stockST02: 10, lowStockThreshold: 5, unit: "顆", enabled: true },
-  { id: "F006", name: "筋膜球（中）", brand: "法夏嚴選", price: 650, cost: 150, stockST01: 18, stockST02: 12, lowStockThreshold: 5, unit: "顆", enabled: true },
-  { id: "F007", name: "筋膜球（小）", brand: "法夏嚴選", price: 580, cost: 130, stockST01: 14, stockST02: 9, lowStockThreshold: 5, unit: "顆", enabled: true },
-  { id: "F008", name: "筋膜圓錐", brand: "法夏嚴選", price: 400, cost: 100, stockST01: 10, stockST02: 7, lowStockThreshold: 4, unit: "個", enabled: true },
-  { id: "F009", name: "筋膜錐", brand: "法夏嚴選", price: 450, cost: 110, stockST01: 9, stockST02: 6, lowStockThreshold: 4, unit: "個", enabled: true },
-  { id: "F010", name: "筋膜頸椎", brand: "法夏嚴選", price: 350, cost: 90, stockST01: 8, stockST02: 5, lowStockThreshold: 3, unit: "個", enabled: true },
-  { id: "F011", name: "軟木足底滾筒", brand: "法夏嚴選", price: 880, cost: 260, stockST01: 6, stockST02: 3, lowStockThreshold: 3, unit: "個", enabled: true },
-  { id: "F012", name: "軟式罐杯", brand: "法夏嚴選", price: 200, cost: 50, stockST01: 20, stockST02: 15, lowStockThreshold: 5, unit: "個", enabled: true },
-  { id: "F013", name: "工具包（單買）", brand: "法夏嚴選", price: 1500, cost: 400, stockST01: 4, stockST02: 2, lowStockThreshold: 3, unit: "個", enabled: true },
+  { id: "F001", name: "Fascia四寶（含工具包）", brand: "法夏嚴選", price: 3800, cost: 1200, stockST01: 5, stockST02: 3, stockST03: 2, lowStockThreshold: 3, unit: "組", enabled: true },
+  { id: "F002", name: "結締筆", brand: "法夏嚴選", price: 950, cost: 280, stockST01: 12, stockST02: 8, stockST03: 6, lowStockThreshold: 5, unit: "支", enabled: true },
+  { id: "F003", name: "鳥嘴筋膜刀", brand: "法夏嚴選", price: 1650, cost: 500, stockST01: 7, stockST02: 4, stockST03: 3, lowStockThreshold: 3, unit: "把", enabled: true },
+  { id: "F004", name: "消波塊", brand: "法夏嚴選", price: 1000, cost: 300, stockST01: 2, stockST02: 1, stockST03: 1, lowStockThreshold: 3, unit: "個", enabled: true },
+  { id: "F005", name: "筋膜球（大）", brand: "法夏嚴選", price: 720, cost: 180, stockST01: 15, stockST02: 10, stockST03: 8, lowStockThreshold: 5, unit: "顆", enabled: true },
+  { id: "F006", name: "筋膜球（中）", brand: "法夏嚴選", price: 650, cost: 150, stockST01: 18, stockST02: 12, stockST03: 10, lowStockThreshold: 5, unit: "顆", enabled: true },
+  { id: "F007", name: "筋膜球（小）", brand: "法夏嚴選", price: 580, cost: 130, stockST01: 14, stockST02: 9, stockST03: 7, lowStockThreshold: 5, unit: "顆", enabled: true },
+  { id: "F008", name: "筋膜圓錐", brand: "法夏嚴選", price: 400, cost: 100, stockST01: 10, stockST02: 7, stockST03: 5, lowStockThreshold: 4, unit: "個", enabled: true },
+  { id: "F009", name: "筋膜錐", brand: "法夏嚴選", price: 450, cost: 110, stockST01: 9, stockST02: 6, stockST03: 4, lowStockThreshold: 4, unit: "個", enabled: true },
+  { id: "F010", name: "筋膜頸椎", brand: "法夏嚴選", price: 350, cost: 90, stockST01: 8, stockST02: 5, stockST03: 4, lowStockThreshold: 3, unit: "個", enabled: true },
+  { id: "F011", name: "軟木足底滾筒", brand: "法夏嚴選", price: 880, cost: 260, stockST01: 6, stockST02: 3, stockST03: 2, lowStockThreshold: 3, unit: "個", enabled: true },
+  { id: "F012", name: "軟式罐杯", brand: "法夏嚴選", price: 200, cost: 50, stockST01: 20, stockST02: 15, stockST03: 10, lowStockThreshold: 5, unit: "個", enabled: true },
+  { id: "F013", name: "工具包（單買）", brand: "法夏嚴選", price: 1500, cost: 400, stockST01: 4, stockST02: 2, stockST03: 2, lowStockThreshold: 3, unit: "個", enabled: true },
   // Sissel（16項）
-  { id: "S001", name: "Sitfit 坐姿矯正墊（經典款 36cm）", brand: "Sissel", price: 1980, cost: 700, stockST01: 6, stockST02: 4, lowStockThreshold: 3, unit: "個", enabled: true },
-  { id: "S002", name: "Sitfit-plus 坐姿矯正墊（進階款 37cm）", brand: "Sissel", price: 2380, cost: 850, stockST01: 3, stockST02: 2, lowStockThreshold: 3, unit: "個", enabled: true },
-  { id: "S003", name: "Sitpro Offichef 坐姿矯正椅（辦公款）", brand: "Sissel", price: 7980, cost: 3000, stockST01: 2, stockST02: 1, lowStockThreshold: 2, unit: "台", enabled: true },
-  { id: "S004", name: "Sitpro Zener 坐姿矯正椅（經典款）", brand: "Sissel", price: 5980, cost: 2200, stockST01: 1, stockST02: 1, lowStockThreshold: 2, unit: "台", enabled: true },
-  { id: "S005", name: "Sitpro Butterfly 坐姿矯正椅（學生款）", brand: "Sissel", price: 9800, cost: 3800, stockST01: 1, stockST02: 0, lowStockThreshold: 1, unit: "台", enabled: true },
-  { id: "S006", name: "Soft-plus 舒柔進階款矯形枕", brand: "Sissel", price: 4980, cost: 1800, stockST01: 4, stockST02: 2, lowStockThreshold: 2, unit: "個", enabled: true },
-  { id: "S007", name: "Deluxe 舒柔豪華款枕頭", brand: "Sissel", price: 5480, cost: 2000, stockST01: 3, stockST02: 1, lowStockThreshold: 2, unit: "個", enabled: true },
-  { id: "S008", name: "Myofascia 筋膜球（大單球 12cm）", brand: "Sissel", price: 880, cost: 300, stockST01: 8, stockST02: 5, lowStockThreshold: 3, unit: "顆", enabled: true },
-  { id: "S009", name: "Myofascia 筋膜球（小單球 8cm）", brand: "Sissel", price: 580, cost: 200, stockST01: 10, stockST02: 7, lowStockThreshold: 4, unit: "顆", enabled: true },
-  { id: "S010", name: "Myofascia 大花生雙球", brand: "Sissel", price: 1280, cost: 450, stockST01: 5, stockST02: 3, lowStockThreshold: 3, unit: "個", enabled: true },
-  { id: "S011", name: "Myofascia 小花生雙球", brand: "Sissel", price: 980, cost: 350, stockST01: 6, stockST02: 4, lowStockThreshold: 3, unit: "個", enabled: true },
-  { id: "S012", name: "Myofascia 筋絡按摩健身滾輪", brand: "Sissel", price: 1680, cost: 600, stockST01: 4, stockST02: 2, lowStockThreshold: 2, unit: "個", enabled: true },
-  { id: "S013", name: "SPINEFITTER 脊給力健身按摩器", brand: "Sissel", price: 4880, cost: 1800, stockST01: 2, stockST02: 1, lowStockThreshold: 2, unit: "個", enabled: true },
-  { id: "S014", name: "Balancefit Pad 專業平衡訓練墊", brand: "Sissel", price: 2880, cost: 1000, stockST01: 3, stockST02: 2, lowStockThreshold: 2, unit: "個", enabled: true },
-  { id: "S015", name: "Pilates Roller Pro 普拉提專業滾輪", brand: "Sissel", price: 1980, cost: 700, stockST01: 4, stockST02: 2, lowStockThreshold: 2, unit: "個", enabled: true },
-  { id: "S016", name: "Fitband Essential 加寬超長彈力帶", brand: "Sissel", price: 350, cost: 100, stockST01: 12, stockST02: 8, lowStockThreshold: 5, unit: "條", enabled: true },
+  { id: "S001", name: "Sitfit 坐姿矯正墊（經典款 36cm）", brand: "Sissel", price: 1980, cost: 700, stockST01: 6, stockST02: 4, stockST03: 3, lowStockThreshold: 3, unit: "個", enabled: true },
+  { id: "S002", name: "Sitfit-plus 坐姿矯正墊（進階款 37cm）", brand: "Sissel", price: 2380, cost: 850, stockST01: 3, stockST02: 2, stockST03: 2, lowStockThreshold: 3, unit: "個", enabled: true },
+  { id: "S003", name: "Sitpro Offichef 坐姿矯正椅（辦公款）", brand: "Sissel", price: 7980, cost: 3000, stockST01: 2, stockST02: 1, stockST03: 1, lowStockThreshold: 2, unit: "台", enabled: true },
+  { id: "S004", name: "Sitpro Zener 坐姿矯正椅（經典款）", brand: "Sissel", price: 5980, cost: 2200, stockST01: 1, stockST02: 1, stockST03: 1, lowStockThreshold: 2, unit: "台", enabled: true },
+  { id: "S005", name: "Sitpro Butterfly 坐姿矯正椅（學生款）", brand: "Sissel", price: 9800, cost: 3800, stockST01: 1, stockST02: 0, stockST03: 0, lowStockThreshold: 1, unit: "台", enabled: true },
+  { id: "S006", name: "Soft-plus 舒柔進階款矯形枕", brand: "Sissel", price: 4980, cost: 1800, stockST01: 4, stockST02: 2, stockST03: 2, lowStockThreshold: 2, unit: "個", enabled: true },
+  { id: "S007", name: "Deluxe 舒柔豪華款枕頭", brand: "Sissel", price: 5480, cost: 2000, stockST01: 3, stockST02: 1, stockST03: 1, lowStockThreshold: 2, unit: "個", enabled: true },
+  { id: "S008", name: "Myofascia 筋膜球（大單球 12cm）", brand: "Sissel", price: 880, cost: 300, stockST01: 8, stockST02: 5, stockST03: 4, lowStockThreshold: 3, unit: "顆", enabled: true },
+  { id: "S009", name: "Myofascia 筋膜球（小單球 8cm）", brand: "Sissel", price: 580, cost: 200, stockST01: 10, stockST02: 7, stockST03: 5, lowStockThreshold: 4, unit: "顆", enabled: true },
+  { id: "S010", name: "Myofascia 大花生雙球", brand: "Sissel", price: 1280, cost: 450, stockST01: 5, stockST02: 3, stockST03: 2, lowStockThreshold: 3, unit: "個", enabled: true },
+  { id: "S011", name: "Myofascia 小花生雙球", brand: "Sissel", price: 980, cost: 350, stockST01: 6, stockST02: 4, stockST03: 3, lowStockThreshold: 3, unit: "個", enabled: true },
+  { id: "S012", name: "Myofascia 筋絡按摩健身滾輪", brand: "Sissel", price: 1680, cost: 600, stockST01: 4, stockST02: 2, stockST03: 2, lowStockThreshold: 2, unit: "個", enabled: true },
+  { id: "S013", name: "SPINEFITTER 脊給力健身按摩器", brand: "Sissel", price: 4880, cost: 1800, stockST01: 2, stockST02: 1, stockST03: 1, lowStockThreshold: 2, unit: "個", enabled: true },
+  { id: "S014", name: "Balancefit Pad 專業平衡訓練墊", brand: "Sissel", price: 2880, cost: 1000, stockST01: 3, stockST02: 2, stockST03: 2, lowStockThreshold: 2, unit: "個", enabled: true },
+  { id: "S015", name: "Pilates Roller Pro 普拉提專業滾輪", brand: "Sissel", price: 1980, cost: 700, stockST01: 4, stockST02: 2, stockST03: 2, lowStockThreshold: 2, unit: "個", enabled: true },
+  { id: "S016", name: "Fitband Essential 加寬超長彈力帶", brand: "Sissel", price: 350, cost: 100, stockST01: 12, stockST02: 8, stockST03: 6, lowStockThreshold: 5, unit: "條", enabled: true },
   // 黃金甲（5項）
-  { id: "G001", name: "GABA睿智膏", brand: "黃金甲", price: 1680, cost: 550, stockST01: 8, stockST02: 5, lowStockThreshold: 5, unit: "盒", enabled: true },
-  { id: "G002", name: "冰晶膠原凍", brand: "黃金甲", price: 2180, cost: 700, stockST01: 6, stockST02: 4, lowStockThreshold: 4, unit: "盒", enabled: true },
-  { id: "G003", name: "白藜蘆醇飲", brand: "黃金甲", price: 2180, cost: 720, stockST01: 5, stockST02: 3, lowStockThreshold: 3, unit: "盒", enabled: true },
-  { id: "G004", name: "葉黃素果凍", brand: "黃金甲", price: 1380, cost: 450, stockST01: 10, stockST02: 7, lowStockThreshold: 5, unit: "盒", enabled: true },
-  { id: "G005", name: "維生素果凍", brand: "黃金甲", price: 990, cost: 320, stockST01: 9, stockST02: 6, lowStockThreshold: 4, unit: "盒", enabled: true },
+  { id: "G001", name: "GABA睿智膏", brand: "黃金甲", price: 1680, cost: 550, stockST01: 8, stockST02: 5, stockST03: 4, lowStockThreshold: 5, unit: "盒", enabled: true },
+  { id: "G002", name: "冰晶膠原凍", brand: "黃金甲", price: 2180, cost: 700, stockST01: 6, stockST02: 4, stockST03: 3, lowStockThreshold: 4, unit: "盒", enabled: true },
+  { id: "G003", name: "白藜蘆醇飲", brand: "黃金甲", price: 2180, cost: 720, stockST01: 5, stockST02: 3, stockST03: 2, lowStockThreshold: 3, unit: "盒", enabled: true },
+  { id: "G004", name: "葉黃素果凍", brand: "黃金甲", price: 1380, cost: 450, stockST01: 10, stockST02: 7, stockST03: 5, lowStockThreshold: 5, unit: "盒", enabled: true },
+  { id: "G005", name: "維生素果凍", brand: "黃金甲", price: 990, cost: 320, stockST01: 9, stockST02: 6, stockST03: 5, lowStockThreshold: 4, unit: "盒", enabled: true },
 ];
 
 // 固定費用範本（每月自動帶入，不含薪水 — 薪水由員工資料自動計算）
