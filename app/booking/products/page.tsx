@@ -332,8 +332,21 @@ export default function ProductsPage() {
 
   const products = PRODUCTS_MAP[activeCategory];
 
-  const handleInquire = (id: string) => {
-    setInquiredIds((prev) => new Set(prev).add(id));
+  const handleInquire = async (product: Product) => {
+    setInquiredIds((prev) => new Set(prev).add(product.id));
+    // 存入 Supabase product_inquiries
+    if (state.user?.id) {
+      const { getCustomerByLineId } = await import("@/lib/customerApi");
+      const customer = await getCustomerByLineId(state.user.id);
+      if (customer) {
+        const { supabase } = await import("@/lib/supabase");
+        await supabase.from("product_inquiries").insert({
+          customer_id: customer.id,
+          product_id: product.id,
+          product_name: product.name,
+        });
+      }
+    }
   };
 
   return (
@@ -442,7 +455,7 @@ export default function ProductsPage() {
                     <>
                       <div className="flex gap-2">
                         <button
-                          onClick={() => handleInquire(product.id)}
+                          onClick={() => handleInquire(product)}
                           className="flex-1 py-3 bg-[#b8956a] text-white text-sm rounded-xl font-medium hover:bg-[#a07d58] transition-colors"
                         >
                           調理時了解此商品

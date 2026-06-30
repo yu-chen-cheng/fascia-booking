@@ -38,6 +38,7 @@ export default function CustomersPage() {
   const [customAmount, setCustomAmount] = useState("");
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesText, setNotesText] = useState("");
+  const [productInquiries, setProductInquiries] = useState<any[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -75,6 +76,14 @@ export default function CustomersPage() {
     setNotesText(c.body_notes ?? "");
     const bookings = await getCustomerBookings(c.id);
     setCustomerBookings(bookings);
+    // 載入產品詢問紀錄
+    const { supabase } = await import("@/lib/supabase");
+    const { data } = await supabase
+      .from("product_inquiries")
+      .select("*")
+      .eq("customer_id", c.id)
+      .order("created_at", { ascending: false });
+    setProductInquiries(data ?? []);
   };
 
   const saveNotes = async () => {
@@ -282,6 +291,21 @@ export default function CustomersPage() {
                 {selectedCustomer.email && <div className="text-sm text-[#1c1c1c]">✉ {selectedCustomer.email}</div>}
                 {selectedCustomer.birthday && <div className="text-sm text-[#1c1c1c]">🎂 {selectedCustomer.birthday}</div>}
               </div>
+
+              {/* Product inquiries */}
+              {productInquiries.length > 0 && (
+                <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+                  <h4 className="text-xs font-medium text-amber-700 mb-3">🛍 客人有興趣的商品</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {productInquiries.map((q: any) => (
+                      <span key={q.id} className="text-xs px-2 py-1 bg-white border border-amber-200 rounded-full text-amber-800">
+                        {q.product_name}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-xs text-amber-600 mt-2">調理時可主動介紹以上商品</p>
+                </div>
+              )}
 
               {/* Recent bookings */}
               <div className="bg-white rounded-xl p-4 border border-[#e8ddd2]">
