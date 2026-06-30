@@ -132,6 +132,52 @@ export default function ConfirmPage() {
             totalPrice: finalPrice,
           });
         }
+
+        // 傳送 Email 預約確認通知
+        if (user.email) {
+          const DAYS_CN_EMAIL = ["日", "一", "二", "三", "四", "五", "六"];
+          const d = new Date(dateStr + "T00:00:00");
+          const dateDisplay = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${DAYS_CN_EMAIL[d.getDay()]}）`;
+          await fetch("/api/send-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: user.email,
+              subject: `【FASCIA 法夏】預約確認 - ${dateDisplay} ${selectedTime}`,
+              html: `
+                <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#faf7f2;padding:24px;border-radius:16px;">
+                  <div style="background:#8b6748;padding:20px;border-radius:12px;text-align:center;margin-bottom:20px;">
+                    <p style="color:#d4b896;font-size:12px;letter-spacing:2px;margin:0">FASCIA 法夏</p>
+                    <h1 style="color:#fff;font-size:20px;margin:8px 0 0">預約確認通知</h1>
+                  </div>
+                  <p style="color:#1c1c1c;font-size:14px;">親愛的 ${user.name} 您好，您的預約已確認！</p>
+                  <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+                    <tr><td style="padding:10px 0;color:#8a7a6e;font-size:13px;border-bottom:1px solid #e8ddd2">日期時間</td><td style="padding:10px 0;font-size:13px;font-weight:600;color:#8b6748;text-align:right;border-bottom:1px solid #e8ddd2">${dateDisplay}　${selectedTime}</td></tr>
+                    <tr><td style="padding:10px 0;color:#8a7a6e;font-size:13px;border-bottom:1px solid #e8ddd2">門市</td><td style="padding:10px 0;font-size:13px;font-weight:500;text-align:right;border-bottom:1px solid #e8ddd2">${selectedStore.name}</td></tr>
+                    <tr><td style="padding:10px 0;color:#8a7a6e;font-size:13px;border-bottom:1px solid #e8ddd2">技師</td><td style="padding:10px 0;font-size:13px;font-weight:500;text-align:right;border-bottom:1px solid #e8ddd2">${selectedTeacher.name} ${selectedTeacher.level}</td></tr>
+                    <tr><td style="padding:10px 0;color:#8a7a6e;font-size:13px;border-bottom:1px solid #e8ddd2">服務</td><td style="padding:10px 0;font-size:13px;font-weight:500;text-align:right;border-bottom:1px solid #e8ddd2">${servicesToShow.map(s => s.name).join("、")}${hasAddon ? " +加購20分" : ""}</td></tr>
+                    <tr><td style="padding:10px 0;color:#8a7a6e;font-size:13px;">費用</td><td style="padding:10px 0;font-size:16px;font-weight:700;color:#8b6748;text-align:right;">NT$${finalPrice.toLocaleString()}</td></tr>
+                  </table>
+                  <p style="font-size:12px;color:#8a7a6e;line-height:1.6;">如需更改或取消，請於調理前 24 小時聯繫我們。<br>感謝您選擇 FASCIA 法夏・筋膜結構美學。</p>
+                </div>
+              `,
+            }),
+          }).catch(() => {}); // Email 失敗不影響預約流程
+        }
+
+        // 儲存到 localStorage，避免 LIFF 跳頁後 context 清空
+        localStorage.setItem("fascia_last_booking", JSON.stringify({
+          storeName: selectedStore.name,
+          teacherName: selectedTeacher.name,
+          teacherLevel: selectedTeacher.level,
+          serviceNames: servicesToShow.map(s => s.name),
+          hasAddon,
+          date: dateStr,
+          timeSlot: selectedTime,
+          totalPrice: finalPrice,
+          customerName: user.name,
+          notes: localNotes || "",
+        }));
       } else {
         setSubmitting(false);
         alert("無法取得客戶資料，請重新登入後再試。");

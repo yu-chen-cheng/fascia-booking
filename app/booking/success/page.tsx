@@ -22,9 +22,26 @@ export default function SuccessPage() {
   const router = useRouter();
   const { state, resetBooking, getTotalPrice } = useBooking();
   const [showStamp, setShowStamp] = useState(false);
+  const [saved, setSaved] = useState<{
+    storeName: string;
+    teacherName: string;
+    teacherLevel: string;
+    serviceNames: string[];
+    hasAddon: boolean;
+    date: string;
+    timeSlot: string;
+    totalPrice: number;
+    customerName: string;
+    notes: string;
+  } | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setShowStamp(true), 300);
+    // 從 localStorage 讀取預約資料（LIFF 跳頁後 context 可能已清空）
+    try {
+      const raw = localStorage.getItem("fascia_last_booking");
+      if (raw) setSaved(JSON.parse(raw));
+    } catch {}
     return () => clearTimeout(t);
   }, []);
 
@@ -41,7 +58,24 @@ export default function SuccessPage() {
     ? selectedServices
     : selectedService ? [selectedService] : [];
 
-  const dateStr = selectedDate
+  // 優先用 localStorage 的資料，context 清空時作為備援
+  const storeName = saved?.storeName || selectedStore?.name || "—";
+  const teacherDisplay = saved
+    ? `${saved.teacherName} ${saved.teacherLevel}`
+    : selectedTeacher ? `${selectedTeacher.name} ${selectedTeacher.level}` : "—";
+  const serviceDisplay = saved
+    ? saved.serviceNames.join("、") + (saved.hasAddon ? " ＋加購20分" : "")
+    : displayServices.map(s => s.name).join("、") + (hasAddon ? " ＋加購20分" : "") || "—";
+  const timeSlotDisplay = saved?.timeSlot || selectedTime || "—";
+  const totalPriceDisplay = saved?.totalPrice ?? getTotalPrice();
+  const notesDisplay = saved?.notes || notes || "";
+
+  const dateStr = saved?.date
+    ? (() => {
+        const d = new Date(saved.date + "T00:00:00");
+        return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${DAYS_CN[d.getDay()]}）`;
+      })()
+    : selectedDate
     ? `${selectedDate.getFullYear()}年${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日（${DAYS_CN[selectedDate.getDay()]}）`
     : "—";
 
@@ -96,11 +130,11 @@ export default function SuccessPage() {
 
           {/* Booking details */}
           <div className="px-6 pt-1 pb-5 space-y-3.5">
-            <DetailRow icon="📅" label="日期時間" value={`${dateStr}　${selectedTime || ""}`} valueClass="text-[#8b6748] font-semibold" />
-            <DetailRow icon="📍" label="門市地點" value={selectedStore?.name || "—"} />
-            <DetailRow icon="👤" label="專屬技師" value={selectedTeacher ? `${selectedTeacher.name} ${selectedTeacher.level}` : "—"} />
-            <DetailRow icon="✨" label="服務項目" value={displayServices.map(s => s.name).join("、") + (hasAddon ? " ＋加購20分" : "") || "—"} />
-            {notes && <DetailRow icon="📝" label="備註" value={notes} />}
+            <DetailRow icon="📅" label="日期時間" value={`${dateStr}　${timeSlotDisplay}`} valueClass="text-[#8b6748] font-semibold" />
+            <DetailRow icon="📍" label="門市地點" value={storeName} />
+            <DetailRow icon="👤" label="專屬技師" value={teacherDisplay} />
+            <DetailRow icon="✨" label="服務項目" value={serviceDisplay} />
+            {notesDisplay && <DetailRow icon="📝" label="備註" value={notesDisplay} />}
           </div>
 
           {/* Notch divider before price */}
@@ -113,7 +147,7 @@ export default function SuccessPage() {
           {/* Price */}
           <div className="px-6 pt-2 pb-5 flex justify-between items-center">
             <span className="text-sm text-gray-500">費用總計</span>
-            <span className="text-2xl font-bold text-[#8b6748]">${getTotalPrice().toLocaleString()}</span>
+            <span className="text-2xl font-bold text-[#8b6748]">${totalPriceDisplay.toLocaleString()}</span>
           </div>
 
           {/* LINE notification */}
@@ -145,7 +179,7 @@ export default function SuccessPage() {
         {/* Actions */}
         <div className="w-full max-w-sm mt-6 space-y-3" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
           <button
-            onClick={() => { resetBooking(); router.push("/booking/store"); }}
+            onClick={() => { localStorage.removeItem("fascia_last_booking"); resetBooking(); router.push("/booking/store"); }}
             className="w-full py-4 bg-[#8b6748] text-white text-base font-medium rounded-2xl shadow-md active:scale-[0.97] transition-all"
           >
             再次預約
@@ -157,7 +191,7 @@ export default function SuccessPage() {
             查看我的預約
           </button>
           <button
-            onClick={() => { resetBooking(); router.push("/"); }}
+            onClick={() => { localStorage.removeItem("fascia_last_booking"); resetBooking(); router.push("/"); }}
             className="w-full py-3 text-sm text-gray-400"
           >
             返回首頁
