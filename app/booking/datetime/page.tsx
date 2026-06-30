@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useBooking } from "@/lib/bookingContext";
 import { generateTimeSlots } from "@/lib/mockData";
 import BookingHeader from "@/components/BookingHeader";
+import { createClient } from "@/lib/supabase";
+
+const supabase = createClient();
 
 const DAYS_CN = ["日", "一", "二", "三", "四", "五", "六"];
 const MONTHS_CN = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"];
@@ -27,6 +30,7 @@ export default function DateTimePage() {
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState<Date | null>(state.selectedDate);
   const [selectedTime, setSelectedTimeLocal] = useState<string | null>(state.selectedTime);
+  const [blockedPeriods, setBlockedPeriods] = useState<{ start: string; end: string }[]>([]);
 
   const duration = state.selectedServices && state.selectedServices.length > 0
     ? state.selectedServices.reduce((sum, s) => sum + s.duration, 0) + (state.hasAddon ? 20 : 0)
@@ -44,7 +48,53 @@ export default function DateTimePage() {
     return d < t;
   };
 
-  const slots = selectedDay ? generateTimeSlots(selectedDay, duration, []) : [];
+  // Fetch blocked periods from schedules when day or teacher changes
+  useEffect(() => {
+    if (!selectedDay || !state.selectedTeacher) {
+      setBlockedPeriods([]);
+      return;
+    }
+
+    const fetchBlocked = async () => {
+      const ymd = `${selectedDay.getFullYear()}-${String(selectedDay.getMonth() + 1).padStart(2, "0")}-${String(selectedDay.getDate()).padStart(2, "0")}`;
+
+      // Find staff_id by teacher name
+      const { data: staffData } = await supabase
+        .from("staff_profiles")
+        .select("id")
+        .eq("name", state.selectedTeacher!.name)
+        .maybeSingle();
+
+      if (!staffData?.id) {
+        setBlockedPeriods([]);
+        return;
+      }
+
+      // Get schedules for that staff on the selected date where blocks_booking = true
+      const { data: schedules } = await supabase
+        .from("schedules")
+        .select("start_time, end_time")
+        .eq("staff_id", staffData.id)
+        .eq("date", ymd)
+        .eq("blocks_booking", true);
+
+      if (!schedules || schedules.length === 0) {
+        setBlockedPeriods([]);
+        return;
+      }
+
+      setBlockedPeriods(
+        schedules.map((s: { start_time: string; end_time: string }) => ({
+          start: s.start_time,
+          end: s.end_time,
+        }))
+      );
+    };
+
+    fetchBlocked();
+  }, [selectedDay, state.selectedTeacher]);
+
+  const slots = selectedDay ? generateTimeSlots(selectedDay, duration, blockedPeriods) : [];
 
   const handleDaySelect = (day: number) => {
     if (isPast(day)) return;

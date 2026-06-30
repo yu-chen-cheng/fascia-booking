@@ -22,7 +22,23 @@ const STATUS_LABEL: Record<BookingStatus, { text: string; color: string; bg: str
   no_show:   { text: "爽約",   color: "text-red-600",    bg: "bg-red-50 border-red-200" },
 };
 
+// Cell background colors for grid view
+const STATUS_CELL_BG: Record<BookingStatus, string> = {
+  pending:   "bg-amber-100 border-amber-300",
+  confirmed: "bg-blue-100 border-blue-300",
+  completed: "bg-green-100 border-green-300",
+  cancelled: "bg-gray-100 border-gray-300 opacity-60",
+  no_show:   "bg-red-100 border-red-300",
+};
+
 const DAY_CN = ["日","一","二","三","四","五","六"];
+
+// Store ID legacy mapping
+const LEGACY_ID_MAP: Record<string, string> = {
+  ST01: "xiaoJudan",
+  ST02: "daan",
+  ST03: "banqiao",
+};
 
 interface Booking {
   id: string;
@@ -45,19 +61,31 @@ interface StaffProfile {
   branch_id: string;
 }
 
+// Generate time slots every 30 min from 10:00 to 21:00
+const TIME_SLOTS: string[] = [];
+for (let h = 10; h <= 21; h++) {
+  TIME_SLOTS.push(`${String(h).padStart(2, "0")}:00`);
+  if (h < 21) TIME_SLOTS.push(`${String(h).padStart(2, "0")}:30`);
+}
+
 function toYMD(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function formatDateCN(ymd: string) {
   const d = new Date(ymd + "T00:00:00");
-  return `${d.getMonth() + 1}/${d.getDate()}（${DAY_CN[d.getDay()]}）`;
+  return `${d.getMonth() + 1}月${d.getDate()}日（${DAY_CN[d.getDay()]}）`;
+}
+
+function shiftDate(ymd: string, delta: number): string {
+  const d = new Date(ymd + "T00:00:00");
+  d.setDate(d.getDate() + delta);
+  return toYMD(d);
 }
 
 export default function BookingsPage() {
   const { user, activeBranchId } = useAdmin();
-  const today = new Date();
-  const todayYMD = toYMD(today);
+  const todayYMD = toYMD(new Date());
 
   const isStaff = user?.role === "員工";
   const canManageAll = user?.role === "管理者" || user?.role === "店長" || user?.role === "會計";
@@ -65,20 +93,14 @@ export default function BookingsPage() {
   const [selectedDate, setSelectedDate] = useState(todayYMD);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [staffList, setStaffList] = useState<StaffProfile[]>([]);
-  const [filterStaffId, setFilterStaffId] = useState(isStaff ? (user?.id ?? "") : "");
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<Booking | null>(null);
   const [noteText, setNoteText] = useState("");
   const [saving, setSaving] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newBooking, setNewBooking] = useState({ customerName: "", phone: "", staffId: "", timeSlot: "10:00", serviceName: "", totalPrice: 0, notes: "" });
-  const [weekOffset, setWeekOffset] = useState(0);
-
-  // 一週日期
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(today.getDate() - today.getDay() + 1 + i + weekOffset * 7);
-    return d;
+  const [newBooking, setNewBooking] = useState({
+    customerName: "", phone: "", staffId: "", timeSlot: "10:00",
+    serviceName: "", totalPrice: 0, notes: "",
   });
 
   const fetchStaff = useCallback(async () => {
@@ -93,37 +115,40 @@ export default function BookingsPage() {
 
   const fetchBookings = useCallback(async () => {
     setLoading(true);
+    const legacyId = LEGACY_ID_MAP[activeBranchId];
+
     let q = supabase
       .from("bookings")
       .select("*, customers(id,name,phone,line_user_id)")
       .eq("date", selectedDate)
-      .eq("store_id", activeBranchId)
       .order("time_slot");
+
+    if (legacyId) {
+      q = q.or(`store_id.eq.${activeBranchId},store_id.eq.${legacyId}`);
+    } else {
+      q = q.eq("store_id", activeBranchId);
+    }
 
     if (isStaff) {
       q = q.eq("staff_id", user?.id ?? "");
-    } else if (filterStaffId) {
-      q = q.eq("staff_id", filterStaffId);
     }
 
     const { data } = await q;
 
-    // 補上技師名稱
     const enriched = (data ?? []).map((b: Booking) => ({
       ...b,
       staff: staffList.find(s => s.id === b.staff_id) ?? null,
     }));
     setBookings(enriched);
     setLoading(false);
-  }, [selectedDate, activeBranchId, isStaff, filterStaffId, user?.id, staffList]);
+  }, [selectedDate, activeBranchId, isStaff, user?.id, staffList]);
 
   useEffect(() => { fetchStaff(); }, [activeBranchId]);
-  useEffect(() => { fetchBookings(); }, [selectedDate, filterStaffId, staffList]);
+  useEffect(() => { fetchBookings(); }, [selectedDate, staffList]);
 
   const updateStatus = async (id: string, status: BookingStatus) => {
     setSaving(true);
     await supabase.from("bookings").update({ status }).eq("id", id);
-    // 爽約：不額外處理，前台預約系統會根據 status 判斷是否開放
     await fetchBookings();
     if (detail?.id === id) setDetail(prev => prev ? { ...prev, status } : null);
     setSaving(false);
@@ -142,7 +167,6 @@ export default function BookingsPage() {
     if (!newBooking.customerName || !newBooking.timeSlot) return;
     setSaving(true);
 
-    // 查或建立客戶
     let customerId: string | null = null;
     if (newBooking.phone) {
       const { data: existing } = await supabase
@@ -185,128 +209,152 @@ export default function BookingsPage() {
     setNoteText(b.notes ?? "");
   };
 
-  // 今日統計
-  const todayStats = {
-    total: bookings.length,
-    confirmed: bookings.filter(b => b.status === "confirmed" || b.status === "pending").length,
-    completed: bookings.filter(b => b.status === "completed").length,
-    noShow: bookings.filter(b => b.status === "no_show").length,
+  const openAddModal = (staffId: string, timeSlot: string) => {
+    setNewBooking(prev => ({ ...prev, staffId, timeSlot }));
+    setShowAddModal(true);
   };
+
+  // Build grid columns: staff columns + "未指定" column
+  const gridColumns = [
+    ...staffList,
+    { id: "__unassigned__", name: "未指定", branch_id: activeBranchId },
+  ];
+
+  // Index bookings by time_slot + staff_id for O(1) lookup
+  const bookingMap: Record<string, Booking[]> = {};
+  for (const b of bookings) {
+    const key = `${b.time_slot}__${b.staff_id ?? "__unassigned__"}`;
+    if (!bookingMap[key]) bookingMap[key] = [];
+    bookingMap[key].push(b);
+  }
+
+  const totalCount = bookings.filter(b => b.status !== "cancelled").length;
 
   if (!user) return null;
 
   return (
-    <div className="p-4 md:p-6 max-w-3xl mx-auto">
+    <div className="p-4 md:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl font-semibold text-[#1c1c1c]">預約管理</h1>
-          <p className="text-sm text-[#8a7a6e] mt-0.5">{formatDateCN(selectedDate)}</p>
+          <p className="text-xs text-[#8a7a6e] mt-0.5">
+            {formatDateCN(selectedDate)} · 共 {totalCount} 筆
+          </p>
         </div>
         {canManageAll && (
-          <button onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 bg-[#8b6748] text-white rounded-xl text-sm font-medium">
+          <button
+            onClick={() => { setNewBooking(prev => ({ ...prev, staffId: "", timeSlot: "10:00" })); setShowAddModal(true); }}
+            className="px-4 py-2 bg-[#8b6748] text-white rounded-xl text-sm font-medium"
+          >
             + 新增預約
           </button>
         )}
       </div>
 
-      {/* Week strip */}
-      <div className="bg-white rounded-2xl border border-[#e8ddd2] p-3 mb-4">
-        <div className="flex items-center gap-1 mb-2">
-          <button onClick={() => setWeekOffset(o => o - 1)} className="text-[#8b6748] px-2 text-lg">‹</button>
-          <div className="flex-1 grid grid-cols-7 gap-1">
-            {weekDays.map(d => {
-              const ymd = toYMD(d);
-              const isSelected = ymd === selectedDate;
-              const isToday = ymd === todayYMD;
-              return (
-                <button key={ymd} onClick={() => setSelectedDate(ymd)}
-                  className={`flex flex-col items-center py-1.5 rounded-xl transition-colors ${
-                    isSelected ? "bg-[#8b6748] text-white" : isToday ? "bg-[#faf7f2] text-[#8b6748]" : "hover:bg-[#faf7f2] text-[#8a7a6e]"
-                  }`}>
-                  <span className="text-[10px]">{DAY_CN[d.getDay()]}</span>
-                  <span className="text-sm font-medium">{d.getDate()}</span>
-                </button>
-              );
-            })}
-          </div>
-          <button onClick={() => setWeekOffset(o => o + 1)} className="text-[#8b6748] px-2 text-lg">›</button>
-        </div>
-      </div>
-
-      {/* Staff filter */}
-      {canManageAll && staffList.length > 0 && (
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-          <button onClick={() => setFilterStaffId("")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap border ${!filterStaffId ? "bg-[#8b6748] text-white border-[#8b6748]" : "bg-white text-[#8a7a6e] border-[#e8ddd2]"}`}>
-            全部
-          </button>
-          {staffList.map(s => (
-            <button key={s.id} onClick={() => setFilterStaffId(s.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap border ${filterStaffId === s.id ? "bg-[#8b6748] text-white border-[#8b6748]" : "bg-white text-[#8a7a6e] border-[#e8ddd2]"}`}>
-              {s.name}
+      {/* Date navigation */}
+      <div className="flex items-center gap-3 mb-4">
+        <button
+          onClick={() => setSelectedDate(d => shiftDate(d, -1))}
+          className="w-9 h-9 flex items-center justify-center rounded-xl border border-[#e8ddd2] bg-white text-[#8b6748] text-lg hover:bg-[#faf7f2]"
+        >
+          ‹
+        </button>
+        <div className="flex-1 text-center">
+          <span className="text-sm font-semibold text-[#1c1c1c]">{formatDateCN(selectedDate)}</span>
+          {selectedDate !== todayYMD && (
+            <button
+              onClick={() => setSelectedDate(todayYMD)}
+              className="ml-2 text-xs text-[#8b6748] underline"
+            >
+              回今天
             </button>
-          ))}
+          )}
         </div>
-      )}
-
-      {/* Day stats */}
-      <div className="grid grid-cols-4 gap-2 mb-4">
-        {[
-          { label: "預約總數", value: todayStats.total, color: "text-[#1c1c1c]" },
-          { label: "待/已確認", value: todayStats.confirmed, color: "text-blue-600" },
-          { label: "已完成", value: todayStats.completed, color: "text-green-600" },
-          { label: "爽約", value: todayStats.noShow, color: "text-red-500" },
-        ].map(s => (
-          <div key={s.label} className="bg-white rounded-xl border border-[#e8ddd2] p-3 text-center">
-            <div className={`text-xl font-light ${s.color}`}>{s.value}</div>
-            <div className="text-[10px] text-[#8a7a6e] mt-0.5">{s.label}</div>
-          </div>
-        ))}
+        <button
+          onClick={() => setSelectedDate(d => shiftDate(d, 1))}
+          className="w-9 h-9 flex items-center justify-center rounded-xl border border-[#e8ddd2] bg-white text-[#8b6748] text-lg hover:bg-[#faf7f2]"
+        >
+          ›
+        </button>
       </div>
 
-      {/* Booking list */}
+      {/* Grid view */}
       {loading ? (
-        <div className="text-center py-12 text-sm text-[#8a7a6e]">載入中…</div>
-      ) : bookings.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-sm text-[#8a7a6e]">本日無預約紀錄</p>
-        </div>
+        <div className="text-center py-16 text-sm text-[#8a7a6e]">載入中…</div>
       ) : (
-        <div className="space-y-3">
-          {bookings.map(b => {
-            const s = STATUS_LABEL[b.status];
-            const staffName = (b.staff as { name?: string } | null)?.name ?? staffList.find(st => st.id === b.staff_id)?.name ?? "未指定";
-            return (
-              <div key={b.id} onClick={() => openDetail(b)}
-                className={`bg-white rounded-2xl border p-4 cursor-pointer hover:shadow-sm transition-shadow ${s.bg}`}>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-base font-semibold text-[#1c1c1c]">{b.time_slot}</span>
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${s.bg} ${s.color}`}>{s.text}</span>
-                    </div>
-                    <div className="text-sm font-medium text-[#1c1c1c]">
-                      {b.customers?.name ?? "訪客"}
-                    </div>
-                    <div className="text-xs text-[#8a7a6e] mt-0.5 flex gap-3">
-                      <span>技師：{staffName}</span>
-                      {b.customers?.phone && <span>{b.customers.phone}</span>}
-                    </div>
-                    {b.notes && (
-                      <div className="text-xs text-[#8a7a6e] mt-1 truncate">備註：{b.notes}</div>
-                    )}
-                  </div>
-                  <div className="text-right ml-3">
-                    <div className="text-sm font-semibold text-[#8b6748]">
-                      ${(b.total_price ?? 0).toLocaleString()}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+        <div className="overflow-x-auto rounded-2xl border border-[#e8ddd2] bg-white">
+          <table className="min-w-max w-full border-collapse text-xs">
+            <thead>
+              <tr className="border-b border-[#e8ddd2]">
+                {/* Time column header */}
+                <th className="sticky left-0 z-10 bg-[#faf7f2] px-3 py-2.5 text-left font-medium text-[#8a7a6e] w-16 border-r border-[#e8ddd2]">
+                  時間
+                </th>
+                {gridColumns.map(col => (
+                  <th
+                    key={col.id}
+                    className="px-3 py-2.5 text-center font-medium text-[#1c1c1c] min-w-[110px] border-r border-[#e8ddd2] last:border-r-0"
+                  >
+                    {col.name}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {TIME_SLOTS.map((slot, rowIdx) => (
+                <tr
+                  key={slot}
+                  className={`border-b border-[#e8ddd2] last:border-b-0 ${rowIdx % 2 === 0 ? "bg-white" : "bg-[#fdfcfb]"}`}
+                >
+                  {/* Time label */}
+                  <td className="sticky left-0 z-10 bg-inherit px-3 py-1.5 text-[#8a7a6e] font-mono border-r border-[#e8ddd2] whitespace-nowrap">
+                    {slot}
+                  </td>
+                  {gridColumns.map(col => {
+                    const key = `${slot}__${col.id}`;
+                    const cellBookings = bookingMap[key] ?? [];
+                    const isUnassigned = col.id === "__unassigned__";
+
+                    return (
+                      <td
+                        key={col.id}
+                        className="px-1.5 py-1 border-r border-[#e8ddd2] last:border-r-0 align-top"
+                        style={{ minWidth: 110 }}
+                      >
+                        <div className="flex flex-col gap-0.5">
+                          {cellBookings.map(b => {
+                            const s = STATUS_LABEL[b.status];
+                            return (
+                              <button
+                                key={b.id}
+                                onClick={() => openDetail(b)}
+                                className={`w-full text-left px-2 py-1 rounded-lg border text-xs leading-tight transition-opacity hover:opacity-80 ${STATUS_CELL_BG[b.status]}`}
+                              >
+                                <div className="font-medium text-[#1c1c1c] truncate">
+                                  {b.customers?.name ?? "訪客"}
+                                </div>
+                                <div className={`text-[10px] ${s.color}`}>{s.text}</div>
+                              </button>
+                            );
+                          })}
+                          {/* Empty cell: click to add */}
+                          {canManageAll && cellBookings.length === 0 && (
+                            <button
+                              onClick={() => openAddModal(isUnassigned ? "" : col.id, slot)}
+                              className="w-full h-7 rounded-lg border border-dashed border-[#e8ddd2] text-[#c8b8a8] hover:border-[#8b6748] hover:text-[#8b6748] hover:bg-[#faf7f2] transition-colors text-[10px]"
+                            >
+                              +
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -324,14 +372,12 @@ export default function BookingsPage() {
               </span>
             </div>
 
-            {/* Info */}
             <div className="bg-[#faf7f2] rounded-xl p-3 mb-4 space-y-1.5 text-sm">
               <Row label="日期" value={formatDateCN(detail.date)} />
               <Row label="技師" value={(detail.staff as { name?: string } | null)?.name ?? staffList.find(s => s.id === detail.staff_id)?.name ?? "未指定"} />
               {detail.customers?.phone && <Row label="電話" value={detail.customers.phone} />}
             </div>
 
-            {/* Notes */}
             <div className="mb-4">
               <label className="text-xs text-[#8a7a6e] mb-1 block">備註</label>
               <textarea value={noteText} onChange={e => setNoteText(e.target.value)} rows={3}
@@ -343,7 +389,6 @@ export default function BookingsPage() {
               </button>
             </div>
 
-            {/* Status actions */}
             {canManageAll && (
               <div className="space-y-2 mb-4">
                 {detail.status === "pending" && (
@@ -375,7 +420,6 @@ export default function BookingsPage() {
               </div>
             )}
 
-            {/* 員工也可以標記爽約 */}
             {isStaff && (detail.status === "confirmed" || detail.status === "pending") && (
               <button onClick={() => {
                 if (confirm("確定標記為爽約？此時段將重新開放。")) updateStatus(detail.id, "no_show");
@@ -422,9 +466,11 @@ export default function BookingsPage() {
                 </select>
               </Field>
               <Field label="時間 *">
-                <input type="time" value={newBooking.timeSlot}
+                <select value={newBooking.timeSlot}
                   onChange={e => setNewBooking(p => ({ ...p, timeSlot: e.target.value }))}
-                  className={inputCls} />
+                  className={inputCls}>
+                  {TIME_SLOTS.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
               </Field>
               <Field label="服務項目">
                 <select value={newBooking.serviceName}
@@ -449,7 +495,10 @@ export default function BookingsPage() {
               </Field>
             </div>
             <div className="flex gap-3 mt-5">
-              <button onClick={() => setShowAddModal(false)} className="flex-1 py-2.5 border border-[#e8ddd2] rounded-xl text-sm text-[#8a7a6e]">取消</button>
+              <button onClick={() => setShowAddModal(false)}
+                className="flex-1 py-2.5 border border-[#e8ddd2] rounded-xl text-sm text-[#8a7a6e]">
+                取消
+              </button>
               <button onClick={handleAddBooking} disabled={saving || !newBooking.customerName}
                 className="flex-1 py-2.5 bg-[#8b6748] text-white rounded-xl text-sm disabled:opacity-50">
                 {saving ? "新增中…" : "新增"}
