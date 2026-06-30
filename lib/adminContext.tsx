@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 
 export type Role = "管理者" | "店長" | "員工" | "會計";
-export type StaffLevel = "準師" | "初階職人" | "進階職人" | "資深職人" | "明星職人";
+export type StaffLevel = "準師" | "初階職人" | "進階職人" | "資深職人" | "技術長";
 export type EmploymentType = "承攬制" | "僱傭制";
 
 export interface AdminUser {

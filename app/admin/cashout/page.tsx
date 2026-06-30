@@ -34,6 +34,7 @@ const EMPTY_FORM = {
   addon_plus15min: false, total_amount: 0,
   cash: 0, stored_value: 0, e_payment: 0, credit_card: 0,
   bank_transfer: 0, voucher: 0, partner: 0, sponsored: 0,
+  addon_products: [] as { name: string; price: number }[],
 };
 
 export default function CashoutPage() {
@@ -42,6 +43,7 @@ export default function CashoutPage() {
   const [tab, setTab] = useState<"結帳" | "日結">("結帳");
   const [checkouts, setCheckouts] = useState<any[]>([]);
   const [staffList, setStaffList] = useState<any[]>([]);
+  const [inventoryList, setInventoryList] = useState<any[]>([]);
   const [rates, setRates] = useState<any[]>([]);
   const [daily, setDaily] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -59,7 +61,7 @@ export default function CashoutPage() {
 
   async function loadData() {
     setLoading(true);
-    const [{ data: co }, { data: sp }, { data: cr }, { data: dc }] = await Promise.all([
+    const [{ data: co }, { data: sp }, { data: cr }, { data: dc }, { data: inv }] = await Promise.all([
       supabase.from("service_checkouts")
         .select("*, staff_profiles(name)")
         .eq("branch_id", activeBranchId)
@@ -71,9 +73,12 @@ export default function CashoutPage() {
       supabase.from("commission_rates").select("*"),
       supabase.from("daily_checkouts").select("*")
         .eq("branch_id", activeBranchId).eq("date", date).maybeSingle(),
+      supabase.from("inventory").select("id,product_name,quantity")
+        .eq("branch_id", activeBranchId).gt("quantity", 0).order("product_name"),
     ]);
     setCheckouts(co ?? []);
     setStaffList(sp ?? []);
+    setInventoryList(inv ?? []);
     setRates(cr ?? []);
     if (dc) {
       setDaily(dc);
@@ -154,11 +159,13 @@ export default function CashoutPage() {
       cash: form.cash, stored_value: form.stored_value, e_payment: form.e_payment,
       credit_card: form.credit_card, bank_transfer: form.bank_transfer,
       voucher: form.voucher, partner: form.partner, sponsored: form.sponsored,
-      addon_plus15min: form.addon_plus15min, staff_commission: commission,
+      addon_plus15min: form.addon_plus15min,
+      addon_products: form.addon_products,
+      staff_commission: commission,
     });
 
     setShowAdd(false);
-    setForm({ ...EMPTY_FORM });
+    setForm({ ...EMPTY_FORM, addon_products: [] });
     loadData();
     setSaving(false);
   }
@@ -404,6 +411,42 @@ export default function CashoutPage() {
                   className="w-4 h-4 accent-[#8b6748]" />
                 加購延長 +15分
               </label>
+
+              {/* Product add-ons */}
+              {inventoryList.length > 0 && (
+                <div>
+                  <div className="text-xs text-[#8a7a6e] mb-2">加購商品</div>
+                  <div className="space-y-1.5">
+                    {inventoryList.map(item => {
+                      const inCart = form.addon_products.find(p => p.name === item.product_name);
+                      return (
+                        <div key={item.id} className="flex items-center justify-between bg-[#faf7f2] rounded-xl px-3 py-2">
+                          <div className="text-sm text-[#1c1c1c]">{item.product_name}</div>
+                          <div className="flex items-center gap-2">
+                            {inCart ? (
+                              <>
+                                <input type="number" value={inCart.price || ""}
+                                  onChange={e => setForm(f => ({
+                                    ...f,
+                                    addon_products: f.addon_products.map(p =>
+                                      p.name === item.product_name ? { ...p, price: parseInt(e.target.value) || 0 } : p
+                                    )
+                                  }))}
+                                  placeholder="金額" className="w-20 border border-[#e8ddd2] rounded-lg px-2 py-1 text-xs text-center" />
+                                <button onClick={() => setForm(f => ({ ...f, addon_products: f.addon_products.filter(p => p.name !== item.product_name) }))}
+                                  className="text-red-400 text-xs px-2 py-1 border border-red-200 rounded-lg">移除</button>
+                              </>
+                            ) : (
+                              <button onClick={() => setForm(f => ({ ...f, addon_products: [...f.addon_products, { name: item.product_name, price: 0 }] }))}
+                                className="text-xs px-3 py-1 bg-white border border-[#e8ddd2] rounded-lg text-[#8b6748]">+ 加購</button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {form.staff_id && (
                 <div className="bg-[#faf7f2] rounded-xl p-3 text-sm">
                   預估抽成：<span className="font-bold text-green-700">

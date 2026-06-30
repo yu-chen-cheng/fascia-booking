@@ -162,6 +162,11 @@ export default function SchedulePage() {
 
   const openAdd = (date: string) => {
     if (!isEditable) return;
+    // 管理者模式下必須先選人員
+    if (isAdmin && !isStaff && !selectedStaffId) {
+      alert("請先選擇員工後再新增事件");
+      return;
+    }
     setModalDate(date);
     setModalEvent(null);
     setForm({ event_type: "早班", start_time: "10:00", end_time: "19:00", custom_label: "", blocks_booking: true });

@@ -5,11 +5,11 @@ import { useAdmin } from "@/lib/adminContext";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
-type Level = "準師" | "初階職人" | "進階職人" | "資深職人" | "明星職人";
+type Level = "準師" | "初階職人" | "進階職人" | "資深職人" | "技術長";
 type EmploymentType = "承攬制" | "僱傭制";
 type Role = "管理者" | "店長" | "員工";
 
-const LEVELS: Level[] = ["準師", "初階職人", "進階職人", "資深職人", "明星職人"];
+const LEVELS: Level[] = ["準師", "初階職人", "進階職人", "資深職人", "技術長"];
 
 const SERVICES = [
   { key: "50min",    name: "智能結構訓練",     duration: 50 },

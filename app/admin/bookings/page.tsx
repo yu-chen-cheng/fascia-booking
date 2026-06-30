@@ -4,6 +4,14 @@ import { useState, useEffect, useCallback } from "react";
 import { useAdmin } from "@/lib/adminContext";
 import { supabase } from "@/lib/supabase";
 
+const BOOKING_SERVICES = [
+  { id: "basic-60",    name: "基礎筋膜放鬆",     duration: 60,  price: 2500 },
+  { id: "refined-90",  name: "精緻筋膜調理",     duration: 90,  price: 3200 },
+  { id: "premium-120", name: "頂級筋膜結構整合", duration: 120, price: 3800 },
+  { id: "training-50", name: "一對一功能式訓練", duration: 50,  price: 2500 },
+  { id: "frequency-40",name: "頻率檢測",         duration: 40,  price: 2500 },
+];
+
 type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled" | "no_show";
 
 const STATUS_LABEL: Record<BookingStatus, { text: string; color: string; bg: string }> = {
@@ -76,7 +84,7 @@ export default function BookingsPage() {
   const fetchStaff = useCallback(async () => {
     const { data } = await supabase
       .from("staff_profiles")
-      .select("id,name,branch_id")
+      .select("id,name,branch_id,level")
       .eq("branch_id", activeBranchId)
       .eq("is_active", true)
       .order("name");
@@ -405,8 +413,12 @@ export default function BookingsPage() {
                 <select value={newBooking.staffId}
                   onChange={e => setNewBooking(p => ({ ...p, staffId: e.target.value }))}
                   className={inputCls}>
-                  <option value="">不指定</option>
-                  {staffList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  <option value="">不指定（系統分配，不含技術長）</option>
+                  {staffList.map((s: any) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}{s.level === "技術長" ? "【技術長】" : ""}
+                    </option>
+                  ))}
                 </select>
               </Field>
               <Field label="時間 *">
@@ -415,9 +427,15 @@ export default function BookingsPage() {
                   className={inputCls} />
               </Field>
               <Field label="服務項目">
-                <input placeholder="例：90分鐘精緻筋膜調理" value={newBooking.serviceName}
-                  onChange={e => setNewBooking(p => ({ ...p, serviceName: e.target.value }))}
-                  className={inputCls} />
+                <select value={newBooking.serviceName}
+                  onChange={e => {
+                    const svc = BOOKING_SERVICES.find(s => s.name === e.target.value);
+                    setNewBooking(p => ({ ...p, serviceName: e.target.value, totalPrice: svc?.price ?? p.totalPrice }));
+                  }}
+                  className={inputCls}>
+                  <option value="">選擇服務</option>
+                  {BOOKING_SERVICES.map(s => <option key={s.id} value={s.name}>{s.name}（{s.duration}分）</option>)}
+                </select>
               </Field>
               <Field label="金額">
                 <input type="number" value={newBooking.totalPrice}
