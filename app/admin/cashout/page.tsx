@@ -1,314 +1,449 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAdmin } from "@/lib/adminContext";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase";
 
-const STORES = [
-  { id: "ST01", name: "小巨蛋店" },
-  { id: "ST02", name: "大安店" },
+const supabase = createClient();
+
+const SERVICES = [
+  { id: "basic-60",    name: "基礎筋膜放鬆",     duration: 60,  commKey: "60min",  price: 2500 },
+  { id: "refined-90",  name: "精緻筋膜調理",     duration: 90,  commKey: "90min",  price: 3200 },
+  { id: "premium-120", name: "頂級筋膜結構整合", duration: 120, commKey: "120min", price: 3800 },
+  { id: "training-50", name: "一對一功能式訓練", duration: 50,  commKey: "50min",  price: 2500 },
+  { id: "frequency-40",name: "頻率檢測",         duration: 40,  commKey: "40min",  price: 2500 },
 ];
 
-// 紙鈔面額
-const BILL_DENOMS = [
-  { value: 2000, label: "2,000 元", color: "bg-purple-50 border-purple-200" },
-  { value: 1000, label: "1,000 元", color: "bg-blue-50 border-blue-200" },
-  { value: 500,  label: "500 元",   color: "bg-green-50 border-green-200" },
-  { value: 100,  label: "100 元",   color: "bg-yellow-50 border-yellow-200" },
+const PAY_FIELDS = [
+  { key: "cash",          label: "現金",     cls: "bg-green-50 border-green-200" },
+  { key: "stored_value",  label: "儲值金",   cls: "bg-amber-50 border-amber-200" },
+  { key: "e_payment",     label: "電子支付", cls: "bg-blue-50 border-blue-200" },
+  { key: "credit_card",   label: "信用卡",   cls: "bg-purple-50 border-purple-200" },
+  { key: "bank_transfer", label: "轉帳",     cls: "bg-cyan-50 border-cyan-200" },
+  { key: "voucher",       label: "墨攻券",   cls: "bg-rose-50 border-rose-200" },
+  { key: "partner",       label: "特約廠商", cls: "bg-orange-50 border-orange-200" },
+  { key: "sponsored",     label: "贊助",     cls: "bg-gray-50 border-gray-200" },
 ];
 
-// 硬幣面額
-const COIN_DENOMS = [
-  { value: 50,  label: "50 元", color: "bg-orange-50 border-orange-200" },
-  { value: 10,  label: "10 元", color: "bg-red-50 border-red-200" },
-  { value: 5,   label: "5 元",  color: "bg-pink-50 border-pink-200" },
-  { value: 1,   label: "1 元",  color: "bg-gray-50 border-gray-200" },
-];
+const BILL_DENOMS = [2000, 1000, 500, 100];
+const COIN_DENOMS = [50, 10, 5, 1];
+const fmt = (n: number) => n.toLocaleString();
 
-type DenomKey = string; // e.g. "d2000", "c50"
-
-function denomKey(value: number, type: "bill" | "coin") {
-  return type === "bill" ? `d${value}` : `c${value}`;
-}
-
-// Mock: today's booking revenue per store
-const MOCK_BOOKING_REVENUE: Record<string, number> = {
-  ST01: 12800,
-  ST02: 9400,
+const EMPTY_FORM = {
+  customer_name: "", customer_phone: "", staff_id: "", service_id: "basic-60",
+  addon_plus15min: false, total_amount: 0,
+  cash: 0, stored_value: 0, e_payment: 0, credit_card: 0,
+  bank_transfer: 0, voucher: 0, partner: 0, sponsored: 0,
 };
 
-function todayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-}
-
 export default function CashoutPage() {
-  const { user } = useAdmin();
-  const router = useRouter();
-  const [selectedStore, setSelectedStore] = useState("ST01");
-  const [date, setDate] = useState(todayStr());
-  const [counts, setCounts] = useState<Record<DenomKey, number>>({});
-  const [systemRevenue] = useState(MOCK_BOOKING_REVENUE);
-  const [note, setNote] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [showBreakdown, setShowBreakdown] = useState(true);
+  const { user, activeBranchId } = useAdmin();
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [tab, setTab] = useState<"結帳" | "日結">("結帳");
+  const [checkouts, setCheckouts] = useState<any[]>([]);
+  const [staffList, setStaffList] = useState<any[]>([]);
+  const [rates, setRates] = useState<any[]>([]);
+  const [daily, setDaily] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ ...EMPTY_FORM });
+  const [denomCounts, setDenomCounts] = useState<Record<string, number>>({});
+  const [dailyForm, setDailyForm] = useState({
+    petty_cash: 3000, reserve_cash: 3000,
+    laundry_fee: 0, laundry_date: "",
+    miscellaneous: 0, miscellaneous_note: "", notes: "",
+  });
+
+  useEffect(() => { loadData(); }, [date, activeBranchId]);
+
+  async function loadData() {
+    setLoading(true);
+    const [{ data: co }, { data: sp }, { data: cr }, { data: dc }] = await Promise.all([
+      supabase.from("service_checkouts")
+        .select("*, staff_profiles(name)")
+        .eq("branch_id", activeBranchId)
+        .gte("created_at", date + "T00:00:00+08:00")
+        .lte("created_at", date + "T23:59:59+08:00")
+        .order("created_at", { ascending: false }),
+      supabase.from("staff_profiles").select("id,name,level,employment_type,session_threshold")
+        .eq("branch_id", activeBranchId).eq("is_active", true),
+      supabase.from("commission_rates").select("*"),
+      supabase.from("daily_checkouts").select("*")
+        .eq("branch_id", activeBranchId).eq("date", date).maybeSingle(),
+    ]);
+    setCheckouts(co ?? []);
+    setStaffList(sp ?? []);
+    setRates(cr ?? []);
+    if (dc) {
+      setDaily(dc);
+      setDailyForm({
+        petty_cash: dc.petty_cash, reserve_cash: dc.reserve_cash,
+        laundry_fee: dc.laundry_fee, laundry_date: dc.laundry_date ?? "",
+        miscellaneous: dc.miscellaneous, miscellaneous_note: dc.miscellaneous_note ?? "",
+        notes: dc.notes ?? "",
+      });
+    }
+    setLoading(false);
+  }
+
+  function calcCommission(staffId: string, serviceId: string, addon: boolean) {
+    const staff = staffList.find(s => s.id === staffId);
+    const svc = SERVICES.find(s => s.id === serviceId);
+    if (!staff || !svc) return 0;
+    const r = rates.find(r => r.employment_type === staff.employment_type && r.level === staff.level && r.service_key === svc.commKey);
+    let c = r?.amount ?? 0;
+    if (addon) {
+      const ar = rates.find(r => r.employment_type === staff.employment_type && r.level === staff.level && r.service_key === "plus15min");
+      c += ar?.amount ?? 0;
+    }
+    return c;
+  }
+
+  const paySum = useMemo(() =>
+    PAY_FIELDS.reduce((s, p) => s + ((form as any)[p.key] || 0), 0), [form]);
+
+  const totals = useMemo(() => checkouts.reduce((acc, c) => ({
+    total: acc.total + c.total_amount,
+    cash: acc.cash + c.cash,
+    stored_value: acc.stored_value + c.stored_value,
+    e_payment: acc.e_payment + c.e_payment,
+    credit_card: acc.credit_card + c.credit_card,
+    bank_transfer: acc.bank_transfer + c.bank_transfer,
+    voucher: acc.voucher + c.voucher,
+    partner: acc.partner + c.partner,
+    sponsored: acc.sponsored + c.sponsored,
+    commission: acc.commission + c.staff_commission,
+  }), { total: 0, cash: 0, stored_value: 0, e_payment: 0, credit_card: 0, bank_transfer: 0, voucher: 0, partner: 0, sponsored: 0, commission: 0 }),
+  [checkouts]);
+
+  const countedCash = useMemo(() => {
+    let t = 0;
+    BILL_DENOMS.forEach(d => t += (denomCounts[`b${d}`] ?? 0) * d);
+    COIN_DENOMS.forEach(d => t += (denomCounts[`c${d}`] ?? 0) * d);
+    return t;
+  }, [denomCounts]);
+
+  async function handleAdd() {
+    if (!form.customer_name || !form.staff_id) return;
+    if (paySum !== form.total_amount) { alert(`付款合計 $${fmt(paySum)} 與應收 $${fmt(form.total_amount)} 不符`); return; }
+    setSaving(true);
+    const svc = SERVICES.find(s => s.id === form.service_id)!;
+    const commission = calcCommission(form.staff_id, form.service_id, form.addon_plus15min);
+
+    let customerId: string | null = null;
+    if (form.customer_phone) {
+      const { data: ex } = await supabase.from("customers").select("id,stored_value").eq("phone", form.customer_phone).maybeSingle();
+      if (ex) {
+        customerId = ex.id;
+        if (form.stored_value > 0) {
+          await supabase.from("customers").update({ stored_value: Math.max(0, ex.stored_value - form.stored_value) }).eq("id", ex.id);
+        }
+      } else {
+        const { data: nc } = await supabase.from("customers").insert({ name: form.customer_name, phone: form.customer_phone }).select("id").single();
+        customerId = nc?.id ?? null;
+      }
+    }
+
+    await supabase.from("service_checkouts").insert({
+      staff_id: form.staff_id, branch_id: activeBranchId,
+      customer_id: customerId, customer_name: form.customer_name,
+      service_key: form.service_id, service_name: svc.name,
+      service_duration: svc.duration + (form.addon_plus15min ? 15 : 0),
+      total_amount: form.total_amount,
+      cash: form.cash, stored_value: form.stored_value, e_payment: form.e_payment,
+      credit_card: form.credit_card, bank_transfer: form.bank_transfer,
+      voucher: form.voucher, partner: form.partner, sponsored: form.sponsored,
+      addon_plus15min: form.addon_plus15min, staff_commission: commission,
+    });
+
+    setShowAdd(false);
+    setForm({ ...EMPTY_FORM });
+    loadData();
+    setSaving(false);
+  }
+
+  async function handleSubmitDaily() {
+    setSaving(true);
+    await supabase.from("daily_checkouts").upsert({
+      branch_id: activeBranchId, date,
+      submitted_by: user?.id,
+      cash_amount: totals.cash,
+      petty_cash: dailyForm.petty_cash, reserve_cash: dailyForm.reserve_cash,
+      laundry_fee: dailyForm.laundry_fee, laundry_date: dailyForm.laundry_date || null,
+      miscellaneous: dailyForm.miscellaneous, miscellaneous_note: dailyForm.miscellaneous_note,
+      total_cash_received: totals.cash, total_stored_value: totals.stored_value,
+      total_e_payment: totals.e_payment, total_credit_card: totals.credit_card,
+      total_transfer: totals.bank_transfer, total_voucher: totals.voucher,
+      total_partner: totals.partner, total_sponsored: totals.sponsored,
+      notes: dailyForm.notes,
+    }, { onConflict: "branch_id,date" });
+    await loadData();
+    setSaving(false);
+    alert("日結已儲存 ✓");
+  }
 
   if (!user) return null;
-  if (user.role !== "管理者" && user.role !== "店長") {
-    return (
-      <div className="p-8 text-center text-[#8a7a6e]">
-        <p>無權限查看此頁面</p>
-        <button onClick={() => router.back()} className="mt-4 text-[#8b6748] text-sm">返回</button>
-      </div>
-    );
-  }
-
-  const setCount = (key: DenomKey, val: number) => {
-    setCounts(prev => ({ ...prev, [key]: Math.max(0, val) }));
-  };
-
-  const billTotal = BILL_DENOMS.reduce((sum, d) => {
-    const k = denomKey(d.value, "bill");
-    return sum + (counts[k] || 0) * d.value;
-  }, 0);
-
-  const coinTotal = COIN_DENOMS.reduce((sum, d) => {
-    const k = denomKey(d.value, "coin");
-    return sum + (counts[k] || 0) * d.value;
-  }, 0);
-
-  const cashTotal = billTotal + coinTotal;
-  const expected = systemRevenue[selectedStore] || 0;
-  const diff = cashTotal - expected;
-
-  const storeName = STORES.find(s => s.id === selectedStore)?.name || "";
-
-  const handleSubmit = () => {
-    // In production: save to Supabase
-    setSubmitted(true);
-  };
-
-  if (submitted) {
-    return (
-      <div className="p-6 max-w-lg mx-auto flex flex-col items-center justify-center min-h-[60vh]">
-        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-            <path d="M5 14L11 20L23 8" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </div>
-        <h2 className="text-lg font-semibold text-[#1c1c1c] mb-1">結帳完成</h2>
-        <p className="text-sm text-[#8a7a6e] mb-2">{storeName} · {date}</p>
-        <p className="text-2xl font-bold text-[#8b6748] mb-1">${cashTotal.toLocaleString()}</p>
-        {diff !== 0 && (
-          <p className={`text-sm mb-4 ${diff > 0 ? "text-green-600" : "text-red-600"}`}>
-            {diff > 0 ? `多收 $${diff.toLocaleString()}` : `短收 $${Math.abs(diff).toLocaleString()}`}
-          </p>
-        )}
-        <button
-          onClick={() => { setSubmitted(false); setCounts({}); setNote(""); }}
-          className="mt-4 px-6 py-2.5 bg-[#8b6748] text-white rounded-xl text-sm font-medium"
-        >
-          重新結帳
-        </button>
-      </div>
-    );
-  }
 
   return (
-    <div className="p-4 md:p-8 max-w-2xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold text-[#1c1c1c]">每日結帳</h1>
-        <p className="text-sm text-[#8a7a6e] mt-1">請清點現金後填入各面額數量</p>
+    <div className="p-4 md:p-6 max-w-2xl mx-auto">
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-lg font-semibold text-[#1c1c1c]">每日結帳</h1>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)}
+          className="text-sm border border-[#e8ddd2] rounded-lg px-3 py-1.5" />
       </div>
 
-      {/* Store + Date */}
-      <div className="bg-white rounded-2xl border border-[#e8ddd2] p-4 mb-4 flex gap-3">
-        <div className="flex-1">
-          <label className="text-xs text-[#8a7a6e] mb-1 block">門市</label>
-          <select
-            value={selectedStore}
-            onChange={e => setSelectedStore(e.target.value)}
-            className="w-full px-3 py-2 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
-          >
-            {STORES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        </div>
-        <div className="flex-1">
-          <label className="text-xs text-[#8a7a6e] mb-1 block">日期</label>
-          <input
-            type="date"
-            value={date}
-            onChange={e => setDate(e.target.value)}
-            className="w-full px-3 py-2 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
-          />
-        </div>
+      <div className="flex gap-1 bg-[#f5ede4] rounded-xl p-1 mb-4">
+        {(["結帳", "日結"] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)}
+            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${tab === t ? "bg-white text-[#8b6748] shadow-sm" : "text-[#8a7a6e]"}`}>
+            {t}
+          </button>
+        ))}
       </div>
 
-      {/* Expected revenue */}
-      <div className="bg-[#faf7f2] border border-[#e8ddd2] rounded-2xl px-5 py-3 mb-4 flex items-center justify-between">
-        <div>
-          <p className="text-xs text-[#8a7a6e]">系統預計現金收入（{storeName}）</p>
-          <p className="text-lg font-semibold text-[#8b6748]">${expected.toLocaleString()}</p>
-        </div>
-        <div className="text-xs text-[#8a7a6e] text-right">
-          <p>當日完成預約</p>
-          <p>現金付款合計</p>
-        </div>
-      </div>
+      {tab === "結帳" && (
+        <>
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            {[
+              { label: "筆數", val: checkouts.length, unit: "筆" },
+              { label: "總收入", val: `$${fmt(totals.total)}`, unit: "" },
+              { label: "總抽成", val: `$${fmt(totals.commission)}`, unit: "" },
+            ].map(({ label, val, unit }) => (
+              <div key={label} className="bg-white rounded-xl p-3 border border-[#e8ddd2] text-center">
+                <div className="text-xs text-[#8a7a6e]">{label}</div>
+                <div className="text-lg font-bold text-[#1c1c1c]">{val}{unit}</div>
+              </div>
+            ))}
+          </div>
 
-      {/* Denomination input */}
-      <div className="bg-white rounded-2xl border border-[#e8ddd2] overflow-hidden mb-4">
-        <button
-          onClick={() => setShowBreakdown(b => !b)}
-          className="w-full flex items-center justify-between px-5 py-4"
-        >
-          <span className="text-sm font-semibold text-[#1c1c1c]">點鈔明細</span>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#8b6748" strokeWidth="1.5"
-            style={{ transform: showBreakdown ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>
-            <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-
-        {showBreakdown && (
-          <div className="px-5 pb-5">
-            {/* Bills */}
-            <p className="text-xs font-medium text-[#8a7a6e] mb-3 tracking-wide uppercase">紙鈔</p>
-            <div className="space-y-2 mb-5">
-              {BILL_DENOMS.map(d => {
-                const k = denomKey(d.value, "bill");
-                const qty = counts[k] || 0;
-                return (
-                  <div key={k} className={`flex items-center gap-3 rounded-xl border p-3 ${d.color}`}>
-                    <div className="flex-1">
-                      <span className="text-sm font-medium text-[#1c1c1c]">{d.label}</span>
-                      {qty > 0 && (
-                        <span className="ml-2 text-xs text-[#8a7a6e]">= ${(qty * d.value).toLocaleString()}</span>
-                      )}
+          <div className="space-y-2 mb-4">
+            {loading ? <div className="py-10 text-center text-sm text-[#8a7a6e]">載入中…</div>
+              : checkouts.length === 0 ? <div className="py-10 text-center text-sm text-[#8a7a6e]">今日尚無結帳記錄</div>
+              : checkouts.map(c => (
+                <div key={c.id} className="bg-white rounded-xl p-4 border border-[#e8ddd2]">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="font-medium text-[#1c1c1c]">{c.customer_name}</div>
+                      <div className="text-sm text-[#8a7a6e]">
+                        {c.service_name}{c.addon_plus15min ? " +15分" : ""}
+                        {c.staff_profiles?.name && ` · ${c.staff_profiles.name}`}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setCount(k, qty - 1)}
-                        className="w-8 h-8 rounded-lg bg-white border border-gray-200 text-gray-600 flex items-center justify-center text-lg leading-none"
-                      >−</button>
-                      <input
-                        type="number"
-                        min="0"
-                        value={qty === 0 ? "" : qty}
-                        onChange={e => setCount(k, Number(e.target.value) || 0)}
-                        placeholder="0"
-                        className="w-14 text-center py-1.5 border border-gray-200 rounded-lg text-sm font-semibold bg-white focus:outline-none focus:border-[#8b6748]"
-                      />
-                      <span className="text-xs text-[#8a7a6e] w-4">張</span>
-                      <button
-                        onClick={() => setCount(k, qty + 1)}
-                        className="w-8 h-8 rounded-lg bg-white border border-gray-200 text-gray-600 flex items-center justify-center text-lg leading-none"
-                      >+</button>
+                    <div className="text-right">
+                      <div className="font-bold text-[#1c1c1c]">${fmt(c.total_amount)}</div>
+                      <div className="text-xs text-green-700">抽 ${fmt(c.staff_commission)}</div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-
-            {/* Coins */}
-            <p className="text-xs font-medium text-[#8a7a6e] mb-3 tracking-wide uppercase">硬幣</p>
-            <div className="space-y-2">
-              {COIN_DENOMS.map(d => {
-                const k = denomKey(d.value, "coin");
-                const qty = counts[k] || 0;
-                return (
-                  <div key={k} className={`flex items-center gap-3 rounded-xl border p-3 ${d.color}`}>
-                    <div className="flex-1">
-                      <span className="text-sm font-medium text-[#1c1c1c]">{d.label}</span>
-                      {qty > 0 && (
-                        <span className="ml-2 text-xs text-[#8a7a6e]">= ${(qty * d.value).toLocaleString()}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setCount(k, qty - 1)}
-                        className="w-8 h-8 rounded-lg bg-white border border-gray-200 text-gray-600 flex items-center justify-center text-lg leading-none"
-                      >−</button>
-                      <input
-                        type="number"
-                        min="0"
-                        value={qty === 0 ? "" : qty}
-                        onChange={e => setCount(k, Number(e.target.value) || 0)}
-                        placeholder="0"
-                        className="w-14 text-center py-1.5 border border-gray-200 rounded-lg text-sm font-semibold bg-white focus:outline-none focus:border-[#8b6748]"
-                      />
-                      <span className="text-xs text-[#8a7a6e] w-4">個</span>
-                      <button
-                        onClick={() => setCount(k, qty + 1)}
-                        className="w-8 h-8 rounded-lg bg-white border border-gray-200 text-gray-600 flex items-center justify-center text-lg leading-none"
-                      >+</button>
-                    </div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {PAY_FIELDS.filter(p => c[p.key] > 0).map(p => (
+                      <span key={p.key} className={`text-xs px-2 py-0.5 rounded-full border ${p.cls}`}>
+                        {p.label} ${fmt(c[p.key])}
+                      </span>
+                    ))}
                   </div>
-                );
-              })}
+                </div>
+              ))}
+          </div>
+
+          <button onClick={() => setShowAdd(true)}
+            className="w-full py-3 bg-[#8b6748] text-white rounded-xl text-sm font-medium">
+            + 新增結帳
+          </button>
+        </>
+      )}
+
+      {tab === "日結" && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl p-4 border border-[#e8ddd2]">
+            <div className="text-sm font-medium text-[#1c1c1c] mb-3">今日收款彙總</div>
+            {PAY_FIELDS.map(p => (
+              <div key={p.key} className="flex justify-between text-sm py-1">
+                <span className="text-[#8a7a6e]">{p.label}</span>
+                <span className={totals[p.key as keyof typeof totals] > 0 ? "font-medium" : "text-[#d0c4b8]"}>
+                  ${fmt(totals[p.key as keyof typeof totals] as number)}
+                </span>
+              </div>
+            ))}
+            <div className="border-t border-[#e8ddd2] mt-2 pt-2 flex justify-between font-bold text-sm">
+              <span>合計</span><span className="text-[#8b6748]">${fmt(totals.total)}</span>
             </div>
           </div>
-        )}
-      </div>
 
-      {/* Summary */}
-      <div className="bg-white rounded-2xl border border-[#e8ddd2] p-5 mb-4">
-        <h3 className="text-xs font-semibold text-[#8a7a6e] uppercase tracking-wide mb-3">結帳總計</h3>
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-[#8a7a6e]">紙鈔合計</span>
-            <span className="font-medium">${billTotal.toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-[#8a7a6e]">硬幣合計</span>
-            <span className="font-medium">${coinTotal.toLocaleString()}</span>
-          </div>
-          <div className="border-t border-[#e8ddd2] pt-2 flex justify-between items-center">
-            <span className="text-base font-semibold text-[#1c1c1c]">現金總計</span>
-            <span className="text-2xl font-bold text-[#8b6748]">${cashTotal.toLocaleString()}</span>
-          </div>
-        </div>
-
-        {/* Diff */}
-        {cashTotal > 0 && (
-          <div className={`mt-3 rounded-xl px-4 py-3 flex items-center justify-between ${
-            diff === 0 ? "bg-green-50 border border-green-200" :
-            diff > 0 ? "bg-blue-50 border border-blue-200" :
-            "bg-red-50 border border-red-200"
-          }`}>
-            <span className={`text-sm font-medium ${
-              diff === 0 ? "text-green-700" : diff > 0 ? "text-blue-700" : "text-red-700"
-            }`}>
-              {diff === 0 ? "✓ 金額正確" : diff > 0 ? "多收" : "⚠ 短收"}
-            </span>
-            {diff !== 0 && (
-              <span className={`text-base font-bold ${diff > 0 ? "text-blue-700" : "text-red-700"}`}>
-                {diff > 0 ? "+" : ""}${diff.toLocaleString()}
+          {/* Cash counting */}
+          <div className="bg-white rounded-xl p-4 border border-[#e8ddd2]">
+            <div className="text-sm font-medium text-[#1c1c1c] mb-3">現金點算</div>
+            <div className="grid grid-cols-2 gap-2">
+              {[...BILL_DENOMS.map(d => ({ d, k: `b${d}` })), ...COIN_DENOMS.map(d => ({ d, k: `c${d}` }))].map(({ d, k }) => (
+                <div key={k} className="flex items-center gap-1.5">
+                  <span className="text-xs text-[#8a7a6e] w-10 text-right">${d}</span>
+                  <input type="number" min={0} value={denomCounts[k] ?? ""}
+                    onChange={e => setDenomCounts(p => ({ ...p, [k]: parseInt(e.target.value) || 0 }))}
+                    placeholder="0" className="w-14 border border-[#e8ddd2] rounded-lg px-2 py-1 text-sm text-center" />
+                  <span className="text-xs text-[#8a7a6e]">= ${fmt((denomCounts[k] ?? 0) * d)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 border-t border-[#e8ddd2] pt-2 flex justify-between text-sm font-medium">
+              <span>點算合計</span>
+              <span className={countedCash === totals.cash && totals.cash > 0 ? "text-green-700" : countedCash !== totals.cash && totals.cash > 0 ? "text-red-600" : ""}>
+                ${fmt(countedCash)}
+                {totals.cash > 0 && countedCash !== totals.cash && ` (差 $${fmt(countedCash - totals.cash)})`}
               </span>
-            )}
+            </div>
           </div>
-        )}
-      </div>
 
-      {/* Note */}
-      <div className="bg-white rounded-2xl border border-[#e8ddd2] p-5 mb-6">
-        <label className="text-xs font-semibold text-[#8a7a6e] uppercase tracking-wide mb-2 block">備註（選填）</label>
-        <textarea
-          value={note}
-          onChange={e => setNote(e.target.value)}
-          placeholder="例：10元找零用完、客人未付等說明…"
-          rows={2}
-          className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm resize-none focus:outline-none focus:border-[#8b6748]"
-        />
-      </div>
+          {/* Daily fields */}
+          <div className="bg-white rounded-xl p-4 border border-[#e8ddd2] space-y-3">
+            <div className="text-sm font-medium text-[#1c1c1c]">收支明細</div>
+            {[
+              { key: "petty_cash", label: "零用金" },
+              { key: "reserve_cash", label: "備用金" },
+              { key: "laundry_fee", label: "洗衣費" },
+              { key: "miscellaneous", label: "雜支" },
+            ].map(({ key, label }) => (
+              <div key={key} className="flex items-center gap-3">
+                <label className="text-sm text-[#8a7a6e] w-16 flex-shrink-0">{label}</label>
+                <input type="number" value={(dailyForm as any)[key]}
+                  onChange={e => setDailyForm(f => ({ ...f, [key]: parseInt(e.target.value) || 0 }))}
+                  className="flex-1 border border-[#e8ddd2] rounded-lg px-3 py-1.5 text-sm" />
+              </div>
+            ))}
+            {dailyForm.laundry_fee > 0 && (
+              <div className="flex items-center gap-3">
+                <label className="text-sm text-[#8a7a6e] w-16">洗衣日期</label>
+                <input type="date" value={dailyForm.laundry_date}
+                  onChange={e => setDailyForm(f => ({ ...f, laundry_date: e.target.value }))}
+                  className="flex-1 border border-[#e8ddd2] rounded-lg px-3 py-1.5 text-sm" />
+              </div>
+            )}
+            {dailyForm.miscellaneous > 0 && (
+              <div className="flex items-center gap-3">
+                <label className="text-sm text-[#8a7a6e] w-16">說明</label>
+                <input type="text" value={dailyForm.miscellaneous_note}
+                  onChange={e => setDailyForm(f => ({ ...f, miscellaneous_note: e.target.value }))}
+                  placeholder="耗材、備品…"
+                  className="flex-1 border border-[#e8ddd2] rounded-lg px-3 py-1.5 text-sm" />
+              </div>
+            )}
+            <div className="flex items-start gap-3">
+              <label className="text-sm text-[#8a7a6e] w-16 pt-2">備註</label>
+              <textarea value={dailyForm.notes}
+                onChange={e => setDailyForm(f => ({ ...f, notes: e.target.value }))}
+                rows={2} className="flex-1 border border-[#e8ddd2] rounded-lg px-3 py-1.5 text-sm resize-none" />
+            </div>
+          </div>
 
-      {/* Submit */}
-      <button
-        onClick={handleSubmit}
-        disabled={cashTotal === 0}
-        className="w-full py-4 bg-[#8b6748] text-white text-base font-medium rounded-2xl shadow-md disabled:opacity-40 active:scale-[0.98] transition-all"
-      >
-        確認結帳 ${cashTotal.toLocaleString()}
-      </button>
+          <div className="bg-[#faf7f2] rounded-xl p-4 border border-[#e8ddd2]">
+            <div className="text-sm font-medium text-[#1c1c1c] mb-2">日結試算</div>
+            {[
+              { label: "現金收入", val: totals.cash },
+              { label: "- 洗衣費", val: -dailyForm.laundry_fee },
+              { label: "- 雜支", val: -dailyForm.miscellaneous },
+              { label: "- 備用金", val: -dailyForm.reserve_cash },
+            ].map(({ label, val }) => (
+              <div key={label} className="flex justify-between text-sm py-0.5">
+                <span className="text-[#8a7a6e]">{label}</span>
+                <span>${fmt(Math.abs(val))}</span>
+              </div>
+            ))}
+            <div className="border-t border-[#e8ddd2] mt-1 pt-1 flex justify-between font-bold text-sm">
+              <span>應上繳現金</span>
+              <span className="text-[#8b6748]">
+                ${fmt(Math.max(0, totals.cash - dailyForm.laundry_fee - dailyForm.miscellaneous - dailyForm.reserve_cash))}
+              </span>
+            </div>
+          </div>
+
+          {daily && <div className="text-xs text-center text-[#8a7a6e]">上次儲存：{new Date(daily.submitted_at).toLocaleString("zh-TW")}</div>}
+
+          <button onClick={handleSubmitDaily} disabled={saving}
+            className="w-full py-3 bg-[#8b6748] text-white rounded-xl text-sm font-medium disabled:opacity-50">
+            {saving ? "儲存中…" : "提交日結"}
+          </button>
+        </div>
+      )}
+
+      {/* Add checkout modal */}
+      {showAdd && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white p-4 border-b border-[#e8ddd2] flex justify-between items-center">
+              <div className="font-medium text-[#1c1c1c]">新增結帳</div>
+              <button onClick={() => { setShowAdd(false); setForm({ ...EMPTY_FORM }); }} className="text-[#8a7a6e]">✕</button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="text-xs text-[#8a7a6e] mb-1 block">客戶姓名 *</label>
+                <input value={form.customer_name} onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))}
+                  placeholder="客戶姓名" className="w-full border border-[#e8ddd2] rounded-xl px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs text-[#8a7a6e] mb-1 block">手機（選填，用於建立會員資料）</label>
+                <input value={form.customer_phone} onChange={e => setForm(f => ({ ...f, customer_phone: e.target.value }))}
+                  placeholder="09xx-xxx-xxx" className="w-full border border-[#e8ddd2] rounded-xl px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs text-[#8a7a6e] mb-1 block">服務技師 *</label>
+                <select value={form.staff_id} onChange={e => setForm(f => ({ ...f, staff_id: e.target.value }))}
+                  className="w-full border border-[#e8ddd2] rounded-xl px-3 py-2 text-sm bg-white">
+                  <option value="">選擇技師</option>
+                  {staffList.map(s => <option key={s.id} value={s.id}>{s.name} ({s.level})</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-[#8a7a6e] mb-1 block">服務項目 *</label>
+                <select value={form.service_id} onChange={e => setForm(f => ({ ...f, service_id: e.target.value }))}
+                  className="w-full border border-[#e8ddd2] rounded-xl px-3 py-2 text-sm bg-white">
+                  {SERVICES.map(s => <option key={s.id} value={s.id}>{s.name}（{s.duration}分）</option>)}
+                </select>
+              </div>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" checked={form.addon_plus15min}
+                  onChange={e => setForm(f => ({ ...f, addon_plus15min: e.target.checked }))}
+                  className="w-4 h-4 accent-[#8b6748]" />
+                加購延長 +15分
+              </label>
+              {form.staff_id && (
+                <div className="bg-[#faf7f2] rounded-xl p-3 text-sm">
+                  預估抽成：<span className="font-bold text-green-700">
+                    ${fmt(calcCommission(form.staff_id, form.service_id, form.addon_plus15min))}
+                  </span>
+                </div>
+              )}
+              <div>
+                <label className="text-xs text-[#8a7a6e] mb-1 block">收費金額 *</label>
+                <input type="number" value={form.total_amount || ""}
+                  onChange={e => setForm(f => ({ ...f, total_amount: parseInt(e.target.value) || 0 }))}
+                  placeholder="0" className="w-full border border-[#e8ddd2] rounded-xl px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <div className="text-xs text-[#8a7a6e] mb-2">付款方式拆分</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {PAY_FIELDS.map(p => (
+                    <div key={p.key}>
+                      <label className="text-xs text-[#8a7a6e]">{p.label}</label>
+                      <input type="number" value={(form as any)[p.key] || ""}
+                        onChange={e => setForm(f => ({ ...f, [p.key]: parseInt(e.target.value) || 0 }))}
+                        placeholder="0" className={`w-full border rounded-xl px-3 py-1.5 text-sm ${p.cls}`} />
+                    </div>
+                  ))}
+                </div>
+                {form.total_amount > 0 && (
+                  <div className={`mt-2 text-xs text-center font-medium ${paySum === form.total_amount ? "text-green-700" : "text-red-600"}`}>
+                    付款合計 ${fmt(paySum)} / 應收 ${fmt(form.total_amount)}
+                    {paySum !== form.total_amount && ` (差 $${fmt(form.total_amount - paySum)})`}
+                  </div>
+                )}
+              </div>
+              <button onClick={handleAdd} disabled={saving || !form.customer_name || !form.staff_id || paySum !== form.total_amount || form.total_amount === 0}
+                className="w-full py-3 bg-[#8b6748] text-white rounded-xl text-sm font-medium disabled:opacity-40">
+                {saving ? "儲存中…" : "確認結帳"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
