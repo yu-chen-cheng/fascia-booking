@@ -56,6 +56,77 @@ export default function HistoryPage() {
     setCancelling(booking.id);
     await cancelBooking(booking.id);
     setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, status: "cancelled" } : b));
+
+    // 發送取消通知（LINE + Email）
+    if (user) {
+      const d = new Date(booking.date + "T00:00:00");
+      const days = ["日", "一", "二", "三", "四", "五", "六"];
+      const dateStr = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}（${days[d.getDay()]}）`;
+
+      // LINE 取消通知
+      await fetch("/api/line-notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lineUserId: user.id,
+          messages: [{
+            type: "flex",
+            altText: `預約取消通知 - ${dateStr} ${booking.time_slot}`,
+            contents: {
+              type: "bubble",
+              styles: { header: { backgroundColor: "#888888" }, body: { backgroundColor: "#faf7f2" } },
+              header: {
+                type: "box", layout: "vertical",
+                contents: [
+                  { type: "text", text: "FASCIA 法夏・筋膜結構美學", color: "#cccccc", size: "xs", weight: "bold", align: "center" },
+                  { type: "text", text: "預約取消通知", color: "#ffffff", size: "lg", weight: "bold", align: "center", margin: "sm" },
+                ],
+                paddingAll: "lg",
+              },
+              body: {
+                type: "box", layout: "vertical", spacing: "md", paddingAll: "lg",
+                contents: [
+                  { type: "text", text: `${user.name} 您好，您的預約已取消。`, size: "sm", color: "#1c1c1c", weight: "bold" },
+                  { type: "separator", margin: "md", color: "#e8ddd2" },
+                  { type: "box", layout: "horizontal", spacing: "md", contents: [
+                    { type: "text", text: "📅", size: "sm", flex: 0 },
+                    { type: "text", text: "日期時間", size: "sm", color: "#8a7a6e", flex: 2 },
+                    { type: "text", text: `${dateStr}  ${booking.time_slot}`, size: "sm", color: "#1c1c1c", weight: "bold", flex: 4, wrap: true },
+                  ]},
+                  { type: "text", text: "如需重新預約，歡迎再次使用線上預約系統。", size: "xs", color: "#8a7a6e", wrap: true, margin: "md" },
+                ],
+              },
+            },
+          }],
+        }),
+      }).catch(() => {});
+
+      // Email 取消通知
+      if (user.email) {
+        await fetch("/api/send-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: user.email,
+            subject: `【FASCIA 法夏】預約取消確認 - ${dateStr} ${booking.time_slot}`,
+            html: `
+              <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#faf7f2;padding:24px;border-radius:16px;">
+                <div style="background:#888888;padding:20px;border-radius:12px;text-align:center;margin-bottom:20px;">
+                  <p style="color:#cccccc;font-size:12px;letter-spacing:2px;margin:0">FASCIA 法夏</p>
+                  <h1 style="color:#fff;font-size:20px;margin:8px 0 0">預約取消通知</h1>
+                </div>
+                <p style="color:#1c1c1c;font-size:14px;">親愛的 ${user.name} 您好，您的預約已取消。</p>
+                <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+                  <tr><td style="padding:10px 0;color:#8a7a6e;font-size:13px;border-bottom:1px solid #e8ddd2">取消日期時間</td><td style="padding:10px 0;font-size:13px;font-weight:600;text-align:right;border-bottom:1px solid #e8ddd2">${dateStr}　${booking.time_slot}</td></tr>
+                </table>
+                <p style="font-size:12px;color:#8a7a6e;line-height:1.6;">如需重新預約，歡迎再次使用線上預約系統。<br>感謝您選擇 FASCIA 法夏・筋膜結構美學。</p>
+              </div>
+            `,
+          }),
+        }).catch(() => {});
+      }
+    }
+
     setCancelling(null);
     setConfirmCancel(null);
   };
