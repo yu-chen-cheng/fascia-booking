@@ -5,8 +5,14 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import Link from "next/link";
 
+const BRANCHES = [
+  { id: "ST01", name: "小巨蛋店" },
+  { id: "ST02", name: "大安店" },
+  { id: "ST03", name: "板橋店" },
+];
+
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
-  const { user, isLoading, logout } = useAdmin();
+  const { user, isLoading, logout, activeBranchId, activeBranchName, setActiveBranch, canSwitchBranch } = useAdmin();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -109,7 +115,23 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         <div className="px-4 py-4 border-t border-[#e8ddd2]">
           <div className="text-xs font-medium text-[#1c1c1c]">{user.name}</div>
           <div className="text-xs text-[#8b6748] mt-0.5">{user.role}</div>
-          {user.branchName && <div className="text-xs text-[#8a7a6e]">{user.branchName}</div>}
+          {/* 分店切換（管理者/會計才顯示） */}
+          {canSwitchBranch ? (
+            <div className="mt-2 space-y-1">
+              {BRANCHES.map(b => (
+                <button key={b.id} onClick={() => setActiveBranch(b.id)}
+                  className={`w-full text-left px-2 py-1 rounded-lg text-xs transition-colors ${
+                    activeBranchId === b.id
+                      ? "bg-[#8b6748] text-white"
+                      : "text-[#8a7a6e] hover:bg-[#faf7f2]"
+                  }`}>
+                  {b.name}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs text-[#8a7a6e] mt-0.5">{activeBranchName}</div>
+          )}
           <button
             onClick={() => { logout(); router.replace("/admin/login"); }}
             className="text-xs text-[#8a7a6e] hover:text-[#8b6748] transition-colors mt-3 block"
@@ -125,7 +147,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         <header className="md:hidden bg-white border-b border-[#e8ddd2] px-4 py-3 flex items-center justify-between sticky top-0 z-10">
           <div>
             <div className="text-[#8b6748] font-semibold text-sm">FASCIA 法夏</div>
-            <div className="text-xs text-[#8a7a6e]">{user.name} · {user.role}{user.branchName ? ` · ${user.branchName}` : ""}</div>
+            <div className="text-xs text-[#8a7a6e]">{user.name} · {user.role} · {activeBranchName}</div>
           </div>
           <button
             onClick={() => { logout(); router.replace("/admin/login"); }}
