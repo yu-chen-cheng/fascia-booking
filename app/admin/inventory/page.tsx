@@ -314,7 +314,7 @@ export default function InventoryPage() {
               <div className="flex items-center gap-3">
                 <button onClick={() => setAdjustForm(f => ({ ...f, qty: f.qty - 1 }))}
                   className="w-10 h-10 bg-[#faf7f2] border border-[#e8ddd2] rounded-xl text-xl font-bold">−</button>
-                <input type="number" value={adjustForm.qty}
+                <input type="text" inputMode="numeric" value={adjustForm.qty}
                   onChange={e => setAdjustForm(f => ({ ...f, qty: parseInt(e.target.value) || 0 }))}
                   className="flex-1 border border-[#e8ddd2] rounded-xl px-3 py-2 text-sm text-center text-lg font-bold" />
                 <button onClick={() => setAdjustForm(f => ({ ...f, qty: f.qty + 1 }))}
