@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useBooking } from "@/lib/bookingContext";
 import { generateTimeSlots } from "@/lib/mockData";
-import { STAFF_EVENTS, ADMIN_STAFF } from "@/lib/adminMockData";
 import BookingHeader from "@/components/BookingHeader";
 
 const DAYS_CN = ["日", "一", "二", "三", "四", "五", "六"];
@@ -45,19 +44,7 @@ export default function DateTimePage() {
     return d < t;
   };
 
-  // Get blocked periods for the selected teacher on the selected day
-  const blockedPeriods = selectedDay && state.selectedTeacher
-    ? (() => {
-        const adminStaff = ADMIN_STAFF.find(s => s.name === state.selectedTeacher!.name);
-        if (!adminStaff) return [];
-        const dayStr = selectedDay.toISOString().split("T")[0];
-        return STAFF_EVENTS
-          .filter(e => e.staffId === adminStaff.id && e.date === dayStr)
-          .map(e => ({ startTime: e.startTime, endTime: e.endTime }));
-      })()
-    : [];
-
-  const slots = selectedDay ? generateTimeSlots(selectedDay, duration, blockedPeriods) : [];
+  const slots = selectedDay ? generateTimeSlots(selectedDay, duration, []) : [];
 
   const handleDaySelect = (day: number) => {
     if (isPast(day)) return;
@@ -79,49 +66,43 @@ export default function DateTimePage() {
     `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${DAYS_CN[d.getDay()]}）`;
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-[#faf7f2]">
       <BookingHeader
         title="選擇日期與時間"
-        subtitle={`調理時長：${duration} 分鐘`}
         onBack={() => router.back()}
-        step={7}
       />
 
-      <div className="flex-1 px-4 py-4 overflow-y-auto">
+      <div className="flex-1 px-4 py-4 space-y-4 overflow-y-auto">
         {/* Calendar */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm ring-1 ring-gray-100 mb-4">
-          {/* Month nav */}
+        <div className="bg-white border border-[#e8ddd2] rounded-xl p-4">
           <div className="flex items-center justify-between mb-4">
-            <button onClick={prevMonth} className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
+            <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                 <path d="M10 12L6 8l4-4" />
               </svg>
             </button>
-            <h3 className="text-base font-semibold text-[#1a1a1a]">
+            <p className="text-sm font-semibold text-[#1c1c1c]">
               {viewYear}年 {MONTHS_CN[viewMonth]}
-            </h3>
-            <button onClick={nextMonth} className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
+            </p>
+            <button onClick={nextMonth} className="w-8 h-8 flex items-center justify-center">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                 <path d="M6 12L10 8 6 4" />
               </svg>
             </button>
           </div>
 
-          {/* Day headers */}
           <div className="grid grid-cols-7 mb-2">
             {DAYS_CN.map((d, i) => (
-              <div key={d} className={`text-center text-xs font-medium py-1 ${i === 0 ? "text-red-400" : "text-gray-400"}`}>
+              <div key={d} className={`text-center text-xs py-1 ${i === 0 ? "text-red-400" : "text-[#8a7a6e]"}`}>
                 {d}
               </div>
             ))}
           </div>
 
-          {/* Days */}
           <div className="grid grid-cols-7 gap-y-1">
             {calDays.map((day, i) => {
               if (!day) return <div key={`empty-${i}`} />;
               const past = isPast(day);
-              const disabled = past;
               const isSelected =
                 selectedDay &&
                 selectedDay.getDate() === day &&
@@ -136,35 +117,31 @@ export default function DateTimePage() {
                 <button
                   key={day}
                   onClick={() => handleDaySelect(day)}
-                  disabled={disabled}
-                  className={`relative h-10 w-full rounded-xl text-sm font-medium transition-all duration-150 ${
+                  disabled={past}
+                  className={`relative h-9 w-full rounded-lg text-sm transition-colors ${
                     isSelected
-                      ? "bg-[#b8956a] text-white shadow-md"
-                      : disabled
-                      ? "text-gray-200 cursor-not-allowed"
-                      : "hover:bg-[#f5f0e8] text-[#1a1a1a] active:scale-95"
+                      ? "bg-[#8b6748] text-white"
+                      : past
+                      ? "text-[#e8ddd2] cursor-not-allowed"
+                      : isToday
+                      ? "text-[#8b6748] font-semibold"
+                      : "text-[#1c1c1c] hover:bg-[#f0e8df]"
                   }`}
                 >
                   {day}
-                  {isToday && !isSelected && (
-                    <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#b8956a]" />
-                  )}
                 </button>
               );
             })}
           </div>
-
         </div>
 
         {/* Time slots */}
         {selectedDay && (
-          <div className="bg-white rounded-2xl p-4 shadow-sm ring-1 ring-gray-100">
-            <h3 className="text-sm font-semibold text-[#1a1a1a] mb-3">
-              {formatDate(selectedDay)} 可用時段
-            </h3>
+          <div className="bg-white border border-[#e8ddd2] rounded-xl p-4">
+            <p className="text-xs text-[#8a7a6e] mb-3">{formatDate(selectedDay)}</p>
 
             {slots.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-4">此日期無可用時段</p>
+              <p className="text-sm text-[#8a7a6e] text-center py-4">此日期無可用時段</p>
             ) : (
               <div className="grid grid-cols-4 gap-2">
                 {slots.map((slot) => (
@@ -178,12 +155,12 @@ export default function DateTimePage() {
                       setTimeout(() => router.push("/booking/confirm"), 150);
                     }}
                     disabled={!slot.available}
-                    className={`py-2.5 px-1 rounded-xl text-sm font-medium transition-all duration-150 ${
+                    className={`py-2.5 rounded-lg text-sm transition-colors ${
                       selectedTime === slot.time
-                        ? "bg-[#b8956a] text-white shadow-md"
+                        ? "bg-[#8b6748] text-white"
                         : !slot.available
-                        ? "bg-gray-50 text-gray-200 cursor-not-allowed"
-                        : "bg-[#fafaf8] text-[#1a1a1a] hover:bg-[#f5f0e8] active:scale-95"
+                        ? "text-[#e8ddd2] cursor-not-allowed"
+                        : "bg-white border border-[#e8ddd2] text-[#1c1c1c] hover:border-[#8b6748]"
                     }`}
                   >
                     {slot.time}
@@ -191,25 +168,9 @@ export default function DateTimePage() {
                 ))}
               </div>
             )}
-
-            <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-50">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded bg-[#fafaf8] border border-gray-200" />
-                <span className="text-xs text-gray-400">可預約</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded bg-[#b8956a]" />
-                <span className="text-xs text-gray-400">已選擇</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded bg-gray-50 border border-gray-100" />
-                <span className="text-xs text-gray-300">已約滿</span>
-              </div>
-            </div>
           </div>
         )}
       </div>
-
     </div>
   );
 }
