@@ -1,7 +1,32 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Store, Teacher, Service, mockUser } from "./mockData";
+
+const SESSION_KEY = "fascia_booking_state";
+
+function loadFromSession(): Partial<BookingState> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    // Restore Date object from ISO string
+    if (parsed.selectedDate) {
+      parsed.selectedDate = new Date(parsed.selectedDate);
+    }
+    return parsed;
+  } catch {
+    return {};
+  }
+}
+
+function saveToSession(state: BookingState) {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(state));
+  } catch {}
+}
 
 export interface BookingState {
   // User
@@ -61,7 +86,14 @@ const initialState: BookingState = {
 const BookingContext = createContext<BookingContextType | undefined>(undefined);
 
 export function BookingProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<BookingState>(initialState);
+  const [state, setState] = useState<BookingState>(() => ({
+    ...initialState,
+    ...loadFromSession(),
+  }));
+
+  useEffect(() => {
+    saveToSession(state);
+  }, [state]);
 
   const update = (partial: Partial<BookingState>) =>
     setState((prev) => ({ ...prev, ...partial }));
@@ -108,13 +140,15 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         setSelectedTime: (selectedTime) => update({ selectedTime }),
         setNotes: (notes) => update({ notes }),
         setCurrentStep: (currentStep) => update({ currentStep }),
-        resetBooking: () =>
+        resetBooking: () => {
+          if (typeof window !== "undefined") sessionStorage.removeItem(SESSION_KEY);
           setState((prev) => ({
             ...initialState,
             user: prev.user,
             isLoggedIn: prev.isLoggedIn,
             consentSigned: prev.consentSigned,
-          })),
+          }));
+        },
         getTotalPrice,
       }}
     >
