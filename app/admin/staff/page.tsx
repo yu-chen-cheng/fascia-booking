@@ -1,34 +1,103 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAdmin } from "@/lib/adminContext";
-import { ADMIN_STAFF, ADMIN_STORES, ADMIN_SERVICES, DEFAULT_COMMISSION_TABLE, CommissionTable, AdminStaff, InternalLevel, DisplayLevel, EmploymentType } from "@/lib/adminMockData";
+import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
-const INTERNAL_LEVELS: InternalLevel[] = ["實習技師", "準技師", "初階老師", "進階老師", "資深老師", "技術長"];
-const DISPLAY_LEVELS: DisplayLevel[] = ["技師職人", "技術長", "準技師", "實習技師"];
+type Level = "準師" | "初階職人" | "進階職人" | "資深職人" | "明星職人";
+type EmploymentType = "承攬制" | "僱傭制";
+type Role = "管理者" | "店長" | "員工";
+
+const LEVELS: Level[] = ["準師", "初階職人", "進階職人", "資深職人", "明星職人"];
+
+const SERVICES = [
+  { key: "50min",    name: "智能結構訓練",     duration: 50 },
+  { key: "60min",    name: "基礎筋膜放鬆",     duration: 60 },
+  { key: "90min",    name: "精緻筋膜調理",     duration: 90 },
+  { key: "120min",   name: "頂級筋膜結構整合", duration: 120 },
+  { key: "40min",    name: "頻率檢測",         duration: 40 },
+  { key: "plus15min",name: "+15min 加購時間",  duration: 15 },
+  { key: "product",  name: "商品銷售獎金",      duration: 0 },
+];
+
+const BRANCHES = [
+  { id: "ST01", name: "小巨蛋店" },
+  { id: "ST02", name: "大安店" },
+  { id: "ST03", name: "板橋店" },
+];
+
+interface StaffProfile {
+  id: string;
+  email: string;
+  name: string;
+  branch_id: string | null;
+  role: Role;
+  level: Level;
+  employment_type: EmploymentType;
+  base_salary: number;
+  position_allowance: number;
+  session_threshold: number;
+  is_active: boolean;
+}
+
+// commission_rates 儲存結構: { [level]: { [service_key]: amount } }
+type CommissionMap = Record<string, Record<string, number>>;
+
+const EMPTY_STAFF: Partial<StaffProfile> & { password: string } = {
+  email: "",
+  password: "fascia2024",
+  name: "",
+  branch_id: "ST01",
+  role: "員工",
+  level: "初階職人",
+  employment_type: "承攬制",
+  base_salary: 0,
+  position_allowance: 0,
+  session_threshold: 40,
+  is_active: true,
+};
 
 export default function StaffPage() {
   const { user } = useAdmin();
   const router = useRouter();
-  const [staff, setStaff] = useState<AdminStaff[]>(ADMIN_STAFF);
-  const [editStaff, setEditStaff] = useState<AdminStaff | null>(null);
+
+  const [staffList, setStaffList] = useState<StaffProfile[]>([]);
+  const [commissionMap, setCommissionMap] = useState<{ 承攬制: CommissionMap; 僱傭制: CommissionMap }>({ 承攬制: {}, 僱傭制: {} });
+  const [loading, setLoading] = useState(true);
+  const [selectedBranch, setSelectedBranch] = useState("ST01");
+  const [showCommission, setShowCommission] = useState(false);
+  const [activeCommissionType, setActiveCommissionType] = useState<EmploymentType>("承攬制");
+  const [editStaff, setEditStaff] = useState<(StaffProfile & { password?: string }) | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedStoreId, setSelectedStoreId] = useState("ST01");
-  const [showCommissionTable, setShowCommissionTable] = useState(false);
-  const [commissionTable, setCommissionTable] = useState<CommissionTable>(DEFAULT_COMMISSION_TABLE);
-  const [editingCell, setEditingCell] = useState<{ serviceId: string; level: InternalLevel } | null>(null);
+  const [newStaff, setNewStaff] = useState(EMPTY_STAFF);
+  const [saving, setSaving] = useState(false);
+  const [editingCell, setEditingCell] = useState<{ type: EmploymentType; level: Level; key: string } | null>(null);
   const [cellValue, setCellValue] = useState("");
-  const [newStaff, setNewStaff] = useState<Partial<AdminStaff>>({
-    internalLevel: "初階老師",
-    displayLevel: "技師職人",
-    storeId: "ST01",
-    employmentType: "承攬制",
-    baseSalary: 0,
-    commissionPerSession: 500,
-    positionAllowance: 0,
-    allowedServiceIds: [],
-  });
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  async function fetchData() {
+    setLoading(true);
+    const [{ data: staff }, { data: rates }] = await Promise.all([
+      supabase.from("staff_profiles").select("id,email,name,branch_id,role,level,employment_type,base_salary,position_allowance,session_threshold,is_active").order("name"),
+      supabase.from("commission_rates").select("employment_type,level,service_key,amount"),
+    ]);
+
+    setStaffList(staff ?? []);
+
+    // Build commission map
+    const map: { 承攬制: CommissionMap; 僱傭制: CommissionMap } = { 承攬制: {}, 僱傭制: {} };
+    for (const r of rates ?? []) {
+      const t = r.employment_type as EmploymentType;
+      if (!map[t][r.level]) map[t][r.level] = {};
+      map[t][r.level][r.service_key] = r.amount;
+    }
+    setCommissionMap(map);
+    setLoading(false);
+  }
 
   if (!user) return null;
   if (user.role !== "管理者") {
@@ -40,54 +109,76 @@ export default function StaffPage() {
     );
   }
 
-  const filteredStaff = staff.filter(s => s.storeId === selectedStoreId);
+  const filteredStaff = staffList.filter(s => s.branch_id === selectedBranch && s.is_active);
 
-  const saveEdit = () => {
-    if (!editStaff) return;
-    setStaff(prev => prev.map(s => s.id === editStaff.id ? editStaff : s));
-    setEditStaff(null);
-  };
+  const getCommission = (type: EmploymentType, level: Level, key: string) =>
+    commissionMap[type]?.[level]?.[key] ?? 0;
 
-  const addNewStaff = () => {
-    const id = `S${String(staff.length + 1).padStart(3, "0")}`;
-    setStaff(prev => [...prev, { ...newStaff, id, username: `staff${staff.length + 1}`, allowedServiceIds: newStaff.allowedServiceIds ?? [] } as AdminStaff]);
-    setShowAddModal(false);
-    setNewStaff({ internalLevel: "初階老師", displayLevel: "技師職人", storeId: "ST01", employmentType: "承攬制", baseSalary: 0, commissionPerSession: 500, positionAllowance: 0, allowedServiceIds: [] });
-  };
-
-  const toggleServiceForStaff = (staffObj: AdminStaff, serviceId: string) => {
-    const current = staffObj.allowedServiceIds ?? [];
-    const updated = current.includes(serviceId) ? current.filter(id => id !== serviceId) : [...current, serviceId];
-    setEditStaff(prev => prev ? { ...prev, allowedServiceIds: updated } : null);
-  };
-
-  const toggleServiceForNew = (serviceId: string) => {
-    const current = newStaff.allowedServiceIds ?? [];
-    const updated = current.includes(serviceId) ? current.filter(id => id !== serviceId) : [...current, serviceId];
-    setNewStaff(p => ({ ...p, allowedServiceIds: updated }));
-  };
-
-  const startEditCell = (serviceId: string, level: InternalLevel) => {
-    setEditingCell({ serviceId, level });
-    setCellValue(String(commissionTable[serviceId]?.[level] ?? 0));
-  };
-
-  const saveCell = () => {
+  const saveCommissionCell = async () => {
     if (!editingCell) return;
-    const val = parseInt(cellValue) || 0;
-    setCommissionTable(prev => ({
+    const { type, level, key } = editingCell;
+    const amount = parseInt(cellValue) || 0;
+    await supabase.from("commission_rates")
+      .upsert({ employment_type: type, level, service_key: key, amount }, { onConflict: "employment_type,level,service_key" });
+    setCommissionMap(prev => ({
       ...prev,
-      [editingCell.serviceId]: {
-        ...prev[editingCell.serviceId],
-        [editingCell.level]: val,
+      [type]: {
+        ...prev[type],
+        [level]: { ...(prev[type][level] ?? {}), [key]: amount },
       },
     }));
     setEditingCell(null);
   };
 
-  // Get effective commission for a staff at a service
-  const getEffectiveCommission = (s: AdminStaff, serviceId: string): number => {
-    return commissionTable[serviceId]?.[s.internalLevel] ?? s.commissionPerSession;
+  const handleAddStaff = async () => {
+    if (!newStaff.email || !newStaff.name || !newStaff.password) return;
+    setSaving(true);
+    const { error } = await supabase.from("staff_profiles").insert({
+      email: newStaff.email.toLowerCase().trim(),
+      password: newStaff.password,
+      name: newStaff.name,
+      branch_id: newStaff.branch_id,
+      role: newStaff.role,
+      level: newStaff.level,
+      employment_type: newStaff.employment_type,
+      base_salary: newStaff.base_salary ?? 0,
+      position_allowance: newStaff.position_allowance ?? 0,
+      session_threshold: newStaff.session_threshold ?? 40,
+    });
+    if (!error) {
+      await fetchData();
+      setShowAddModal(false);
+      setNewStaff(EMPTY_STAFF);
+    } else {
+      alert("新增失敗：" + error.message);
+    }
+    setSaving(false);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editStaff) return;
+    setSaving(true);
+    const updateData: Record<string, unknown> = {
+      name: editStaff.name,
+      branch_id: editStaff.branch_id,
+      role: editStaff.role,
+      level: editStaff.level,
+      employment_type: editStaff.employment_type,
+      base_salary: editStaff.base_salary,
+      position_allowance: editStaff.position_allowance,
+      session_threshold: editStaff.session_threshold,
+    };
+    if (editStaff.password) updateData.password = editStaff.password;
+    await supabase.from("staff_profiles").update(updateData).eq("id", editStaff.id);
+    await fetchData();
+    setEditStaff(null);
+    setSaving(false);
+  };
+
+  const handleDeactivate = async (id: string) => {
+    if (!confirm("確定要停用此員工帳號？")) return;
+    await supabase.from("staff_profiles").update({ is_active: false }).eq("id", id);
+    await fetchData();
   };
 
   return (
@@ -95,337 +186,365 @@ export default function StaffPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-[#1c1c1c]">員工管理</h1>
-          <p className="text-sm text-[#8a7a6e] mt-1">共 {filteredStaff.length} 位員工</p>
+          <p className="text-sm text-[#8a7a6e] mt-0.5">{filteredStaff.length} 位員工在職</p>
         </div>
-        <button onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-[#8b6748] text-white rounded-xl text-sm">
+        <button onClick={() => setShowAddModal(true)}
+          className="px-4 py-2 bg-[#8b6748] text-white rounded-xl text-sm font-medium">
           + 新增員工
         </button>
       </div>
 
-      {/* Store tabs */}
-      <div className="flex gap-2 mb-4">
-        {ADMIN_STORES.map(s => (
-          <button key={s.id} onClick={() => setSelectedStoreId(s.id)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
-              selectedStoreId === s.id ? "bg-[#8b6748] text-white border-[#8b6748]" : "bg-white text-[#8a7a6e] border-[#e8ddd2]"
+      {/* Branch tabs */}
+      <div className="flex gap-2 mb-5 overflow-x-auto">
+        {BRANCHES.map(b => (
+          <button key={b.id} onClick={() => setSelectedBranch(b.id)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap border transition-colors ${
+              selectedBranch === b.id
+                ? "bg-[#8b6748] text-white border-[#8b6748]"
+                : "bg-white text-[#8a7a6e] border-[#e8ddd2]"
             }`}>
-            {s.name}
+            {b.name}
           </button>
         ))}
       </div>
 
-      {/* Commission table section */}
-      <div className="bg-white rounded-2xl border border-[#e8ddd2] mb-4 overflow-hidden">
-        <button
-          onClick={() => setShowCommissionTable(o => !o)}
-          className="w-full flex items-center justify-between px-5 py-4"
-        >
+      {/* Commission table */}
+      <div className="bg-white rounded-2xl border border-[#e8ddd2] mb-5 overflow-hidden">
+        <button onClick={() => setShowCommission(o => !o)}
+          className="w-full flex items-center justify-between px-5 py-4">
           <div>
-            <span className="text-sm font-medium text-[#1c1c1c]">各層級抽成費率設定</span>
-            <span className="text-xs text-[#8a7a6e] ml-2">（點擊金額可編輯）</span>
+            <span className="text-sm font-medium text-[#1c1c1c]">各職級抽成費率設定</span>
+            <span className="text-xs text-[#8a7a6e] ml-2">點擊金額可編輯</span>
           </div>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#8b6748" strokeWidth="1.5"
-            style={{ transform: showCommissionTable ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>
+            style={{ transform: showCommission ? "rotate(180deg)" : "rotate(0)", transition: "transform .2s" }}>
             <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
 
-        {showCommissionTable && (
-          <div className="px-5 pb-5">
-            <p className="text-xs text-[#8a7a6e] mb-3">
-              依員工內部職級 × 服務品項設定每筆抽成金額（元）。員工升級後，抽成費率自動更新。
-            </p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs border-collapse">
-                <thead>
-                  <tr>
-                    <th className="text-left py-2 pr-3 text-[#8a7a6e] font-medium whitespace-nowrap min-w-[120px]">服務品項</th>
-                    {INTERNAL_LEVELS.map(level => (
-                      <th key={level} className="text-center py-2 px-2 text-[#8a7a6e] font-medium whitespace-nowrap min-w-[72px]">
-                        {level}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {ADMIN_SERVICES.map(svc => (
-                    <tr key={svc.id} className="border-t border-[#f0e8df]">
-                      <td className="py-2 pr-3 text-[#1c1c1c] font-medium whitespace-nowrap">
-                        <div>{svc.name}</div>
-                        <div className="text-[10px] text-[#8a7a6e]">{svc.duration}分鐘</div>
-                      </td>
-                      {INTERNAL_LEVELS.map(level => {
-                        const isEditing = editingCell?.serviceId === svc.id && editingCell?.level === level;
-                        const amount = commissionTable[svc.id]?.[level] ?? 0;
-                        return (
-                          <td key={level} className="py-2 px-1 text-center">
-                            {isEditing ? (
-                              <input
-                                autoFocus
-                                type="number"
-                                value={cellValue}
-                                onChange={e => setCellValue(e.target.value)}
-                                onBlur={saveCell}
-                                onKeyDown={e => { if (e.key === "Enter") saveCell(); if (e.key === "Escape") setEditingCell(null); }}
-                                className="w-16 px-1 py-1 border border-[#8b6748] rounded-lg text-center text-xs focus:outline-none"
-                              />
-                            ) : (
-                              <button
-                                onClick={() => startEditCell(svc.id, level)}
-                                className="w-full py-1.5 rounded-lg bg-[#faf7f2] hover:bg-[#f0e8df] text-[#8b6748] font-semibold transition-colors"
-                              >
-                                ${amount}
-                              </button>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        {showCommission && (
+          <div className="px-5 pb-5 border-t border-[#f0e8df]">
+            {/* Tab: 承攬制 / 僱傭制 */}
+            <div className="flex gap-2 mt-4 mb-4">
+              {(["承攬制", "僱傭制"] as EmploymentType[]).map(t => (
+                <button key={t} onClick={() => setActiveCommissionType(t)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    activeCommissionType === t
+                      ? "bg-[#8b6748] text-white"
+                      : "bg-[#faf7f2] text-[#8a7a6e] border border-[#e8ddd2]"
+                  }`}>
+                  {t}
+                </button>
+              ))}
             </div>
-            <p className="text-[10px] text-[#8a7a6e] mt-3">
-              💡 點擊任一金額格可直接編輯，按 Enter 或點擊其他位置儲存。費率調整後立即生效於費用計算。
-            </p>
+
+            {activeCommissionType === "承攬制" && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs border-collapse min-w-[520px]">
+                  <thead>
+                    <tr>
+                      <th className="text-left py-2 pr-3 text-[#8a7a6e] font-medium min-w-[120px]">服務項目</th>
+                      {LEVELS.map(l => (
+                        <th key={l} className="text-center py-2 px-2 text-[#8a7a6e] font-medium min-w-[70px]">{l}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {SERVICES.map(svc => (
+                      <tr key={svc.key} className="border-t border-[#f0e8df]">
+                        <td className="py-2 pr-3 text-[#1c1c1c] font-medium">
+                          <div>{svc.name}</div>
+                          {svc.duration > 0 && <div className="text-[10px] text-[#8a7a6e]">{svc.duration}分鐘</div>}
+                        </td>
+                        {LEVELS.map(level => {
+                          const isEditing = editingCell?.type === "承攬制" && editingCell?.level === level && editingCell?.key === svc.key;
+                          return (
+                            <td key={level} className="py-1 px-1 text-center">
+                              {isEditing ? (
+                                <input autoFocus type="number" value={cellValue}
+                                  onChange={e => setCellValue(e.target.value)}
+                                  onBlur={saveCommissionCell}
+                                  onKeyDown={e => { if (e.key === "Enter") saveCommissionCell(); if (e.key === "Escape") setEditingCell(null); }}
+                                  className="w-16 px-1 py-1 border border-[#8b6748] rounded-lg text-center text-xs focus:outline-none" />
+                              ) : (
+                                <button onClick={() => { setEditingCell({ type: "承攬制", level, key: svc.key }); setCellValue(String(getCommission("承攬制", level, svc.key))); }}
+                                  className="w-full py-1.5 rounded-lg bg-[#faf7f2] hover:bg-[#f0e8df] text-[#8b6748] font-semibold transition-colors">
+                                  ${getCommission("承攬制", level, svc.key).toLocaleString()}
+                                </button>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {activeCommissionType === "僱傭制" && (
+              <div>
+                <p className="text-xs text-[#8a7a6e] mb-3">滿 40 人次後，每筆服務計抽成（以 60min 為基準人次）</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse min-w-[400px]">
+                    <thead>
+                      <tr>
+                        <th className="text-left py-2 pr-3 text-[#8a7a6e] font-medium">項目</th>
+                        {LEVELS.map(l => (
+                          <th key={l} className="text-center py-2 px-2 text-[#8a7a6e] font-medium min-w-[70px]">{l}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { key: "60min", name: "每人次（60min基準）" },
+                        { key: "plus15min", name: "+15min 加購" },
+                        { key: "product", name: "商品銷售獎金" },
+                      ].map(svc => (
+                        <tr key={svc.key} className="border-t border-[#f0e8df]">
+                          <td className="py-2 pr-3 text-[#1c1c1c] font-medium">{svc.name}</td>
+                          {LEVELS.map(level => {
+                            const isEditing = editingCell?.type === "僱傭制" && editingCell?.level === level && editingCell?.key === svc.key;
+                            return (
+                              <td key={level} className="py-1 px-1 text-center">
+                                {isEditing ? (
+                                  <input autoFocus type="number" value={cellValue}
+                                    onChange={e => setCellValue(e.target.value)}
+                                    onBlur={saveCommissionCell}
+                                    onKeyDown={e => { if (e.key === "Enter") saveCommissionCell(); if (e.key === "Escape") setEditingCell(null); }}
+                                    className="w-16 px-1 py-1 border border-[#8b6748] rounded-lg text-center text-xs focus:outline-none" />
+                                ) : (
+                                  <button onClick={() => { setEditingCell({ type: "僱傭制", level, key: svc.key }); setCellValue(String(getCommission("僱傭制", level, svc.key))); }}
+                                    className="w-full py-1.5 rounded-lg bg-[#faf7f2] hover:bg-[#f0e8df] text-[#8b6748] font-semibold transition-colors">
+                                    ${getCommission("僱傭制", level, svc.key).toLocaleString()}
+                                  </button>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
 
       {/* Staff list */}
-      <div className="space-y-3">
-        {filteredStaff.map(s => {
-          const store = ADMIN_STORES.find(st => st.id === s.storeId);
-          const allowedServices = ADMIN_SERVICES.filter(sv => (s.allowedServiceIds ?? []).includes(sv.id));
-          return (
+      {loading ? (
+        <div className="text-center py-10 text-sm text-[#8a7a6e]">載入中…</div>
+      ) : filteredStaff.length === 0 ? (
+        <div className="text-center py-10 text-sm text-[#8a7a6e]">此分店尚無在職員工</div>
+      ) : (
+        <div className="space-y-3">
+          {filteredStaff.map(s => (
             <div key={s.id} className="bg-white rounded-2xl border border-[#e8ddd2] p-4">
               <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-medium text-[#1c1c1c]">{s.name}</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-[#faf7f2] text-[#8b6748] border border-[#e8ddd2]">
-                      {s.displayLevel}
-                    </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-sm font-semibold text-[#1c1c1c]">{s.name}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      s.role === "管理者" ? "bg-purple-50 text-purple-700" :
+                      s.role === "店長" ? "bg-blue-50 text-blue-700" :
+                      "bg-[#faf7f2] text-[#8b6748]"
+                    }`}>{s.role}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      s.employment_type === "僱傭制" ? "bg-orange-50 text-orange-700" : "bg-green-50 text-green-700"
+                    }`}>{s.employment_type}</span>
                   </div>
                   <div className="text-xs text-[#8a7a6e] space-y-0.5">
-                    <div>內部職級：<span className="font-medium text-[#1c1c1c]">{s.internalLevel}</span></div>
-                    <div>所屬門市：{store?.name}</div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${s.employmentType === "僱傭制" ? "bg-orange-50 text-orange-700" : "bg-blue-50 text-blue-700"}`}>{s.employmentType}</span>
-                      {s.employmentType === "僱傭制" && <span>底薪 ${s.baseSalary.toLocaleString()}</span>}
-                      {s.positionAllowance > 0 && <span>加給 ${s.positionAllowance.toLocaleString()}</span>}
-                    </div>
-                    <div>帳號：{s.username}</div>
+                    <div>職級：<span className="font-medium text-[#1c1c1c]">{s.level}</span></div>
+                    <div className="text-[#8a7a6e]">{s.email}</div>
+                    {s.employment_type === "僱傭制" && s.base_salary > 0 && (
+                      <div>底薪：<span className="font-medium text-[#1c1c1c]">${s.base_salary.toLocaleString()}</span></div>
+                    )}
+                    {s.position_allowance > 0 && (
+                      <div>職務加給：<span className="font-medium text-[#1c1c1c]">${s.position_allowance.toLocaleString()}</span></div>
+                    )}
                   </div>
 
-                  {/* Per-service commission rates for this staff's level */}
-                  {allowedServices.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-[#f0e8df]">
-                      <div className="text-[10px] text-[#8a7a6e] mb-1">
-                        各品項抽成（{s.internalLevel}）
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {allowedServices.map(svc => (
-                          <div key={svc.id} className="text-[10px] bg-[#faf7f2] rounded-lg px-2 py-1 border border-[#e8ddd2]">
-                            <span className="text-[#1c1c1c]">{svc.name}</span>
-                            <span className="text-[#8b6748] font-semibold ml-1">
-                              ${getEffectiveCommission(s, svc.id).toLocaleString()}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
+                  {/* Commission preview */}
+                  <div className="mt-2 pt-2 border-t border-[#f0e8df]">
+                    <div className="text-[10px] text-[#8a7a6e] mb-1">此職級抽成（{s.employment_type}）</div>
+                    <div className="flex flex-wrap gap-1">
+                      {SERVICES.slice(0, 5).map(svc => (
+                        <span key={svc.key} className="text-[10px] bg-[#faf7f2] border border-[#e8ddd2] rounded-lg px-2 py-0.5">
+                          {svc.name.slice(0, 6)} <span className="text-[#8b6748] font-semibold">${getCommission(s.employment_type, s.level, svc.key)}</span>
+                        </span>
+                      ))}
                     </div>
-                  )}
+                  </div>
                 </div>
-                <button onClick={() => setEditStaff({ ...s })}
-                  className="px-3 py-1.5 border border-[#e8ddd2] text-[#8a7a6e] rounded-lg text-xs ml-3">
+                <button onClick={() => setEditStaff({ ...s, password: "" })}
+                  className="ml-3 px-3 py-1.5 border border-[#e8ddd2] text-[#8a7a6e] rounded-lg text-xs shrink-0">
                   編輯
                 </button>
               </div>
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {/* Edit staff modal */}
+      {/* Edit Modal */}
       {editStaff && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
-            <h3 className="text-base font-medium text-[#1c1c1c] mb-4">編輯員工 - {editStaff.name}</h3>
+            <h3 className="text-base font-medium text-[#1c1c1c] mb-4">編輯 - {editStaff.name}</h3>
             <div className="space-y-3">
-              <div>
-                <label className="text-xs text-[#8a7a6e] mb-1 block">姓名</label>
-                <input value={editStaff.name}
-                  onChange={e => setEditStaff(prev => prev ? { ...prev, name: e.target.value } : null)}
-                  className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]" />
-              </div>
-              <div>
-                <label className="text-xs text-[#8a7a6e] mb-1 block">內部職級</label>
-                <select value={editStaff.internalLevel}
-                  onChange={e => setEditStaff(prev => prev ? { ...prev, internalLevel: e.target.value as InternalLevel } : null)}
-                  className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]">
-                  {INTERNAL_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+              <Field label="姓名">
+                <input value={editStaff.name} onChange={e => setEditStaff(p => p && ({ ...p, name: e.target.value }))}
+                  className={inputCls} />
+              </Field>
+              <Field label="職級">
+                <select value={editStaff.level} onChange={e => setEditStaff(p => p && ({ ...p, level: e.target.value as Level }))}
+                  className={inputCls}>
+                  {LEVELS.map(l => <option key={l}>{l}</option>)}
                 </select>
-              </div>
+              </Field>
+              <Field label="角色">
+                <select value={editStaff.role} onChange={e => setEditStaff(p => p && ({ ...p, role: e.target.value as Role }))}
+                  className={inputCls}>
+                  {["員工","店長","管理者"].map(r => <option key={r}>{r}</option>)}
+                </select>
+              </Field>
+              <Field label="所屬分店">
+                <select value={editStaff.branch_id ?? ""} onChange={e => setEditStaff(p => p && ({ ...p, branch_id: e.target.value }))}
+                  className={inputCls}>
+                  {BRANCHES.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </Field>
+              <Field label="聘用制度">
+                <select value={editStaff.employment_type} onChange={e => setEditStaff(p => p && ({ ...p, employment_type: e.target.value as EmploymentType }))}
+                  className={inputCls}>
+                  <option value="承攬制">承攬制（純抽成）</option>
+                  <option value="僱傭制">僱傭制（底薪＋抽成）</option>
+                </select>
+              </Field>
+              {editStaff.employment_type === "僱傭制" && (
+                <Field label="底薪（元／月）">
+                  <input type="number" value={editStaff.base_salary} onChange={e => setEditStaff(p => p && ({ ...p, base_salary: Number(e.target.value) }))}
+                    className={inputCls} />
+                </Field>
+              )}
+              <Field label="職務加給（元／月）">
+                <input type="number" value={editStaff.position_allowance} onChange={e => setEditStaff(p => p && ({ ...p, position_allowance: Number(e.target.value) }))}
+                  className={inputCls} />
+              </Field>
+              <Field label="重設密碼（留空不更改）">
+                <input type="text" placeholder="輸入新密碼" value={editStaff.password ?? ""} onChange={e => setEditStaff(p => p && ({ ...p, password: e.target.value }))}
+                  className={inputCls} />
+              </Field>
 
-              {/* Show effective commissions for selected level */}
+              {/* Commission preview for this staff's level */}
               <div className="bg-[#faf7f2] rounded-xl p-3 border border-[#e8ddd2]">
-                <div className="text-xs text-[#8a7a6e] font-medium mb-2">此職級的各品項抽成預覽</div>
+                <div className="text-xs text-[#8a7a6e] font-medium mb-2">{editStaff.level} 抽成預覽（{editStaff.employment_type}）</div>
                 <div className="space-y-1">
-                  {ADMIN_SERVICES.map(svc => (
-                    <div key={svc.id} className="flex justify-between text-xs">
+                  {SERVICES.map(svc => (
+                    <div key={svc.key} className="flex justify-between text-xs">
                       <span className="text-[#8a7a6e]">{svc.name}</span>
-                      <span className="font-semibold text-[#8b6748]">
-                        ${(commissionTable[svc.id]?.[editStaff.internalLevel] ?? 0).toLocaleString()}／筆
-                      </span>
+                      <span className="font-semibold text-[#8b6748]">${getCommission(editStaff.employment_type, editStaff.level, svc.key).toLocaleString()}</span>
                     </div>
                   ))}
                 </div>
-                <p className="text-[10px] text-[#8a7a6e] mt-2">如需調整，請至「各層級抽成費率設定」修改</p>
               </div>
+            </div>
 
-              <div>
-                <label className="text-xs text-[#8a7a6e] mb-1 block">對外顯示職級</label>
-                <select value={editStaff.displayLevel}
-                  onChange={e => setEditStaff(prev => prev ? { ...prev, displayLevel: e.target.value as DisplayLevel } : null)}
-                  className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]">
-                  {DISPLAY_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-[#8a7a6e] mb-1 block">所屬門市</label>
-                <select value={editStaff.storeId}
-                  onChange={e => setEditStaff(prev => prev ? { ...prev, storeId: e.target.value } : null)}
-                  className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]">
-                  {ADMIN_STORES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-[#8a7a6e] mb-1 block">聘用制度</label>
-                <select value={editStaff.employmentType}
-                  onChange={e => setEditStaff(prev => prev ? { ...prev, employmentType: e.target.value as EmploymentType, baseSalary: e.target.value === "承攬制" ? 0 : prev.baseSalary } : null)}
-                  className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]">
-                  <option value="承攬制">承攬制（無底薪，純抽成）</option>
-                  <option value="僱傭制">僱傭制（底薪 + 抽成）</option>
-                </select>
-              </div>
-              {editStaff.employmentType === "僱傭制" && (
-                <div>
-                  <label className="text-xs text-[#8a7a6e] mb-1 block">底薪（元／月）</label>
-                  <input type="number" min={0} value={editStaff.baseSalary}
-                    onChange={e => setEditStaff(prev => prev ? { ...prev, baseSalary: Number(e.target.value) } : null)}
-                    className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]" />
-                </div>
-              )}
-              {editStaff.employmentType === "僱傭制" && (
-                <div>
-                  <label className="text-xs text-[#8a7a6e] mb-1 block">職位加給（元／月）</label>
-                  <input type="number" min={0} value={editStaff.positionAllowance}
-                    onChange={e => setEditStaff(prev => prev ? { ...prev, positionAllowance: Number(e.target.value) } : null)}
-                    className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]" />
-                </div>
-              )}
-              <div>
-                <label className="text-xs text-[#8a7a6e] mb-2 block">可執行服務</label>
-                <div className="space-y-1">
-                  {ADMIN_SERVICES.map(sv => {
-                    const allowed = (editStaff.allowedServiceIds ?? []).includes(sv.id);
-                    return (
-                      <label key={sv.id} className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" checked={allowed} onChange={() => toggleServiceForStaff(editStaff, sv.id)}
-                          className="rounded border-[#e8ddd2] accent-[#8b6748]" />
-                        <span className="text-xs text-[#1c1c1c]">{sv.name}</span>
-                        <span className="text-xs text-[#8a7a6e]">({sv.duration}分)</span>
-                        <span className="text-xs text-[#8b6748] font-medium ml-auto">
-                          ${(commissionTable[sv.id]?.[editStaff.internalLevel] ?? 0).toLocaleString()}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-3 mt-4">
+            <div className="flex gap-3 mt-5">
               <button onClick={() => setEditStaff(null)} className="flex-1 py-2.5 border border-[#e8ddd2] rounded-xl text-sm text-[#8a7a6e]">取消</button>
-              <button onClick={saveEdit} className="flex-1 py-2.5 bg-[#8b6748] text-white rounded-xl text-sm">儲存</button>
+              <button onClick={handleSaveEdit} disabled={saving} className="flex-1 py-2.5 bg-[#8b6748] text-white rounded-xl text-sm disabled:opacity-50">
+                {saving ? "儲存中…" : "儲存"}
+              </button>
             </div>
+            <button onClick={() => handleDeactivate(editStaff.id)}
+              className="w-full mt-2 py-2 text-xs text-red-400 hover:text-red-600 transition-colors">
+              停用此帳號
+            </button>
           </div>
         </div>
       )}
 
-      {/* Add staff modal */}
+      {/* Add Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
             <h3 className="text-base font-medium text-[#1c1c1c] mb-4">新增員工</h3>
             <div className="space-y-3">
-              <input placeholder="姓名" value={newStaff.name || ""}
-                onChange={e => setNewStaff(p => ({ ...p, name: e.target.value }))}
-                className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]" />
-              <select value={newStaff.internalLevel}
-                onChange={e => setNewStaff(p => ({ ...p, internalLevel: e.target.value as InternalLevel }))}
-                className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]">
-                {INTERNAL_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
-              </select>
+              <Field label="姓名 *">
+                <input placeholder="員工姓名" value={newStaff.name ?? ""}
+                  onChange={e => setNewStaff(p => ({ ...p, name: e.target.value }))}
+                  className={inputCls} />
+              </Field>
+              <Field label="信箱 *">
+                <input type="email" placeholder="employee@email.com" value={newStaff.email ?? ""}
+                  onChange={e => setNewStaff(p => ({ ...p, email: e.target.value }))}
+                  className={inputCls} />
+              </Field>
+              <Field label="初始密碼 *">
+                <input value={newStaff.password}
+                  onChange={e => setNewStaff(p => ({ ...p, password: e.target.value }))}
+                  className={inputCls} />
+              </Field>
+              <Field label="職級">
+                <select value={newStaff.level} onChange={e => setNewStaff(p => ({ ...p, level: e.target.value as Level }))}
+                  className={inputCls}>
+                  {LEVELS.map(l => <option key={l}>{l}</option>)}
+                </select>
+              </Field>
+              <Field label="角色">
+                <select value={newStaff.role} onChange={e => setNewStaff(p => ({ ...p, role: e.target.value as Role }))}
+                  className={inputCls}>
+                  {["員工","店長","管理者"].map(r => <option key={r}>{r}</option>)}
+                </select>
+              </Field>
+              <Field label="所屬分店">
+                <select value={newStaff.branch_id ?? "ST01"} onChange={e => setNewStaff(p => ({ ...p, branch_id: e.target.value }))}
+                  className={inputCls}>
+                  {BRANCHES.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </Field>
+              <Field label="聘用制度">
+                <select value={newStaff.employment_type} onChange={e => setNewStaff(p => ({ ...p, employment_type: e.target.value as EmploymentType }))}
+                  className={inputCls}>
+                  <option value="承攬制">承攬制（純抽成）</option>
+                  <option value="僱傭制">僱傭制（底薪＋抽成）</option>
+                </select>
+              </Field>
+              {newStaff.employment_type === "僱傭制" && (
+                <Field label="底薪（元／月）">
+                  <input type="number" value={newStaff.base_salary ?? 0}
+                    onChange={e => setNewStaff(p => ({ ...p, base_salary: Number(e.target.value) }))}
+                    className={inputCls} />
+                </Field>
+              )}
+              <Field label="職務加給（元／月）">
+                <input type="number" value={newStaff.position_allowance ?? 0}
+                  onChange={e => setNewStaff(p => ({ ...p, position_allowance: Number(e.target.value) }))}
+                  className={inputCls} />
+              </Field>
 
-              {/* Preview commissions for new staff's level */}
+              {/* Commission preview */}
               <div className="bg-[#faf7f2] rounded-xl p-3 border border-[#e8ddd2]">
-                <div className="text-xs text-[#8a7a6e] mb-1">此職級抽成預覽</div>
-                {ADMIN_SERVICES.slice(0, 3).map(svc => (
-                  <div key={svc.id} className="flex justify-between text-xs">
+                <div className="text-xs text-[#8a7a6e] mb-1">{newStaff.level} 抽成預覽（{newStaff.employment_type}）</div>
+                {SERVICES.slice(0, 4).map(svc => (
+                  <div key={svc.key} className="flex justify-between text-xs">
                     <span className="text-[#8a7a6e]">{svc.name}</span>
                     <span className="font-semibold text-[#8b6748]">
-                      ${(commissionTable[svc.id]?.[newStaff.internalLevel as InternalLevel] ?? 0).toLocaleString()}
+                      ${getCommission(newStaff.employment_type as EmploymentType, newStaff.level as Level, svc.key)}
                     </span>
                   </div>
                 ))}
-                <p className="text-[10px] text-[#8a7a6e] mt-1">…依費率表自動套用</p>
-              </div>
-
-              <select value={newStaff.displayLevel}
-                onChange={e => setNewStaff(p => ({ ...p, displayLevel: e.target.value as DisplayLevel }))}
-                className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]">
-                {DISPLAY_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
-              </select>
-              <select value={newStaff.storeId}
-                onChange={e => setNewStaff(p => ({ ...p, storeId: e.target.value }))}
-                className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]">
-                {ADMIN_STORES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-              <select value={newStaff.employmentType}
-                onChange={e => setNewStaff(p => ({ ...p, employmentType: e.target.value as EmploymentType, baseSalary: e.target.value === "承攬制" ? 0 : p.baseSalary }))}
-                className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]">
-                <option value="承攬制">承攬制（純抽成）</option>
-                <option value="僱傭制">僱傭制（底薪 + 抽成）</option>
-              </select>
-              {newStaff.employmentType === "僱傭制" && (
-                <input type="number" placeholder="底薪（元／月）" value={newStaff.baseSalary || ""}
-                  onChange={e => setNewStaff(p => ({ ...p, baseSalary: Number(e.target.value) }))}
-                  className="w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]" />
-              )}
-              <div>
-                <label className="text-xs text-[#8a7a6e] mb-2 block">可執行服務</label>
-                <div className="space-y-1">
-                  {ADMIN_SERVICES.map(sv => {
-                    const allowed = (newStaff.allowedServiceIds ?? []).includes(sv.id);
-                    return (
-                      <label key={sv.id} className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" checked={allowed} onChange={() => toggleServiceForNew(sv.id)}
-                          className="rounded border-[#e8ddd2] accent-[#8b6748]" />
-                        <span className="text-xs text-[#1c1c1c]">{sv.name}</span>
-                        <span className="text-xs text-[#8a7a6e] ml-1">({sv.duration}分)</span>
-                        <span className="text-xs text-[#8b6748] font-medium ml-auto">
-                          ${(commissionTable[sv.id]?.[newStaff.internalLevel as InternalLevel] ?? 0).toLocaleString()}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
               </div>
             </div>
-            <div className="flex gap-3 mt-4">
+
+            <div className="flex gap-3 mt-5">
               <button onClick={() => setShowAddModal(false)} className="flex-1 py-2.5 border border-[#e8ddd2] rounded-xl text-sm text-[#8a7a6e]">取消</button>
-              <button onClick={addNewStaff} disabled={!newStaff.name} className="flex-1 py-2.5 bg-[#8b6748] text-white rounded-xl text-sm disabled:opacity-50">新增</button>
+              <button onClick={handleAddStaff} disabled={saving || !newStaff.name || !newStaff.email}
+                className="flex-1 py-2.5 bg-[#8b6748] text-white rounded-xl text-sm disabled:opacity-50">
+                {saving ? "新增中…" : "新增"}
+              </button>
             </div>
           </div>
         </div>
@@ -433,3 +552,14 @@ export default function StaffPage() {
     </div>
   );
 }
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="text-xs text-[#8a7a6e] mb-1 block">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+const inputCls = "w-full px-3 py-2.5 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748] bg-white";

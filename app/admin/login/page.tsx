@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 export default function LoginPage() {
   const { login, user } = useAdmin();
   const router = useRouter();
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,19 +17,17 @@ export default function LoginPage() {
     return null;
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-    setTimeout(() => {
-      const success = login(username, password);
-      if (success) {
-        router.replace("/admin/dashboard");
-      } else {
-        setError("帳號或密碼錯誤，請重試");
-        setLoading(false);
-      }
-    }, 500);
+    const result = await login(email, password);
+    if (result.success) {
+      router.replace("/admin/dashboard");
+    } else {
+      setError(result.error ?? "登入失敗");
+      setLoading(false);
+    }
   };
 
   return (
@@ -43,17 +41,18 @@ export default function LoginPage() {
 
         {/* Card */}
         <div className="bg-white rounded-2xl border border-[#e8ddd2] p-8 shadow-sm">
-          <h2 className="text-lg font-medium text-[#1c1c1c] mb-6 text-center">登入</h2>
+          <h2 className="text-lg font-medium text-[#1c1c1c] mb-6 text-center">員工登入</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm text-[#8a7a6e] mb-1.5">帳號</label>
+              <label className="block text-sm text-[#8a7a6e] mb-1.5">電子信箱</label>
               <input
-                type="text"
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-                placeholder="輸入帳號"
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="輸入信箱"
                 required
+                autoComplete="email"
                 className="w-full px-4 py-3 rounded-xl border border-[#e8ddd2] bg-[#faf7f2] text-sm focus:outline-none focus:border-[#8b6748] transition-colors"
               />
             </div>
@@ -65,6 +64,7 @@ export default function LoginPage() {
                 onChange={e => setPassword(e.target.value)}
                 placeholder="輸入密碼"
                 required
+                autoComplete="current-password"
                 className="w-full px-4 py-3 rounded-xl border border-[#e8ddd2] bg-[#faf7f2] text-sm focus:outline-none focus:border-[#8b6748] transition-colors"
               />
             </div>
@@ -85,24 +85,9 @@ export default function LoginPage() {
           </form>
         </div>
 
-        {/* Role hints */}
-        <div className="mt-6 bg-white rounded-xl border border-[#e8ddd2] p-4">
-          <p className="text-xs text-[#8a7a6e] mb-3 font-medium">測試帳號</p>
-          <div className="space-y-2 text-xs text-[#8a7a6e]">
-            <div className="flex justify-between">
-              <span>admin / admin123</span>
-              <span className="text-[#8b6748]">管理者</span>
-            </div>
-            <div className="flex justify-between">
-              <span>manager / mgr123</span>
-              <span className="text-[#8b6748]">店長</span>
-            </div>
-            <div className="flex justify-between">
-              <span>staff1 / staff123</span>
-              <span className="text-[#8b6748]">員工</span>
-            </div>
-          </div>
-        </div>
+        <p className="text-center text-xs text-[#8a7a6e] mt-6">
+          忘記密碼請聯繫管理者
+        </p>
       </div>
     </div>
   );

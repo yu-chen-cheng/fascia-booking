@@ -96,11 +96,12 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="px-4 py-4 border-t border-[#e8ddd2]">
-          <div className="text-xs text-[#8a7a6e] mb-1">{user.name}</div>
-          <div className="text-xs text-[#8b6748] font-medium mb-3">{user.role}</div>
+          <div className="text-xs font-medium text-[#1c1c1c]">{user.name}</div>
+          <div className="text-xs text-[#8b6748] mt-0.5">{user.role}</div>
+          {user.branchName && <div className="text-xs text-[#8a7a6e]">{user.branchName}</div>}
           <button
             onClick={() => { logout(); router.replace("/admin/login"); }}
-            className="text-xs text-[#8a7a6e] hover:text-[#8b6748] transition-colors"
+            className="text-xs text-[#8a7a6e] hover:text-[#8b6748] transition-colors mt-3 block"
           >
             登出
           </button>
@@ -113,7 +114,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         <header className="md:hidden bg-white border-b border-[#e8ddd2] px-4 py-3 flex items-center justify-between sticky top-0 z-10">
           <div>
             <div className="text-[#8b6748] font-semibold text-sm">FASCIA 法夏</div>
-            <div className="text-xs text-[#8a7a6e]">{user.name} · {user.role}</div>
+            <div className="text-xs text-[#8a7a6e]">{user.name} · {user.role}{user.branchName ? ` · ${user.branchName}` : ""}</div>
           </div>
           <button
             onClick={() => { logout(); router.replace("/admin/login"); }}

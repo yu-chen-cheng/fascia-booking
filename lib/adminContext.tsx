@@ -3,67 +3,72 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 
 export type Role = "管理者" | "店長" | "員工";
+export type StaffLevel = "準師" | "初階職人" | "進階職人" | "資深職人" | "明星職人";
+export type EmploymentType = "承攬制" | "僱傭制";
 
 export interface AdminUser {
-  username: string;
-  role: Role;
+  id: string;
+  email: string;
   name: string;
-  staffId?: string;
+  role: Role;
+  level: StaffLevel;
+  employmentType: EmploymentType;
+  branchId: string | null;
+  branchName: string;
+  baseSalary: number;
+  positionAllowance: number;
+  sessionThreshold: number;
 }
 
 interface AdminContextType {
   user: AdminUser | null;
-  login: (username: string, password: string) => boolean;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   isLoading: boolean;
 }
 
-const MOCK_USERS: Record<string, { password: string; user: AdminUser }> = {
-  admin: {
-    password: "admin123",
-    user: { username: "admin", role: "管理者", name: "系統管理員" },
-  },
-  manager: {
-    password: "mgr123",
-    user: { username: "manager", role: "店長", name: "王小明", staffId: "S001" },
-  },
-  staff1: {
-    password: "staff123",
-    user: { username: "staff1", role: "員工", name: "陳美玲", staffId: "S002" },
-  },
-};
-
 const AdminContext = createContext<AdminContextType | null>(null);
+
+const STORAGE_KEY = "fascia_admin_user";
 
 export function AdminProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AdminUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem("fascia_admin_user");
+    const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
         setUser(JSON.parse(stored));
       } catch {
-        localStorage.removeItem("fascia_admin_user");
+        localStorage.removeItem(STORAGE_KEY);
       }
     }
     setIsLoading(false);
   }, []);
 
-  const login = (username: string, password: string): boolean => {
-    const record = MOCK_USERS[username];
-    if (record && record.password === password) {
-      setUser(record.user);
-      localStorage.setItem("fascia_admin_user", JSON.stringify(record.user));
-      return true;
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch("/api/admin/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error ?? "登入失敗" };
+      }
+      setUser(data.staff);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data.staff));
+      return { success: true };
+    } catch {
+      return { success: false, error: "網路錯誤，請稍後再試" };
     }
-    return false;
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem("fascia_admin_user");
+    localStorage.removeItem(STORAGE_KEY);
   };
 
   return (
