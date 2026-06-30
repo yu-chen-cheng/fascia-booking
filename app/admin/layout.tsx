@@ -38,6 +38,10 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     { href: "/admin/bookings", label: "預約", icon: "⊟" },
     ...(isAdmin || isManager ? [{ href: "/admin/customers", label: "會員", icon: "◉" }] : []),
     { href: "/admin/notifications", label: "通知", icon: "◈", hidden: !(isAdmin || isManager) },
+    ...(isAdmin || isManager ? [
+      { href: "/admin/cashout", label: "結帳", icon: "💴" },
+      { href: "/admin/attendance", label: "打卡", icon: "⏱" },
+    ] : []),
     ...(isAdmin ? [
       { href: "/admin/staff", label: "員工", icon: "◎" },
       { href: "/admin/services", label: "服務", icon: "◇" },
@@ -48,6 +52,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   ].filter(item => !item.hidden);
 
   const settingsItems = isAdmin ? [
+    { href: "/admin/cashout", label: "每日結帳" },
+    { href: "/admin/attendance", label: "打卡薪資" },
     { href: "/admin/staff", label: "員工管理" },
     { href: "/admin/services", label: "服務項目" },
     { href: "/admin/reports", label: "業績報表" },
@@ -55,6 +61,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     { href: "/admin/inventory", label: "貨物管理" },
     { href: "/admin/notifications", label: "通知設定" },
   ] : isManager ? [
+    { href: "/admin/cashout", label: "每日結帳" },
+    { href: "/admin/attendance", label: "打卡薪資" },
     { href: "/admin/notifications", label: "通知設定" },
   ] : [];
 
