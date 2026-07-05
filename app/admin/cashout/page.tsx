@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useAdmin } from "@/lib/adminContext";
-import { createClient } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 
-const supabase = createClient();
 
 const SERVICES = [
   { id: "basic-60",    name: "基礎筋膜放鬆",     duration: 60,  commKey: "60min",  price: 2500 },

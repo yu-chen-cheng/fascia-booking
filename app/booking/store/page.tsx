@@ -16,7 +16,7 @@ export default function StorePage() {
   const handleSelect = (store: Store) => {
     setSelectedStore(store);
     setSelected(store);
-    setTimeout(() => router.push("/booking/teacher"), 150);
+    setTimeout(() => router.replace("/booking/teacher"), 150);
   };
 
   return (
@@ -46,7 +46,7 @@ export default function StorePage() {
       <div className="px-4 py-4 border-t border-[#e8ddd2]">
         <button
           onClick={() => {
-            if (selected) router.push("/booking/teacher");
+            if (selected) router.replace("/booking/teacher");
           }}
           disabled={!selected}
           className={`w-full py-3.5 rounded-xl text-sm font-medium transition-colors ${

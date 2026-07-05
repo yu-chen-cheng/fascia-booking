@@ -23,7 +23,7 @@ export default function NotesPage() {
 
   const handleContinue = () => {
     setNotes(notes);
-    router.push("/booking/confirm");
+    router.replace("/booking/confirm");
   };
 
   const toggleSuggestion = (s: string) => {
@@ -45,7 +45,7 @@ export default function NotesPage() {
       <BookingHeader
         title="備註"
         subtitle="告訴技師您的需求（選填）"
-        onBack={() => router.back()}
+        onBack={() => router.push("/booking/confirm")}
         step={8}
       />
 

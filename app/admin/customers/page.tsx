@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useAdmin } from "@/lib/adminContext";
-import { createClient } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 
-const supabase = createClient();
 const fmt = (n: number) => n.toLocaleString();
 
 const LEVEL_MAP: Record<string, string> = {

@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useAdmin } from "@/lib/adminContext";
-import { createClient } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 
-const supabase = createClient();
 const fmt = (n: number) => n.toLocaleString();
 
 // expenses table doesn't exist in schema — we use daily_checkouts for expense tracking

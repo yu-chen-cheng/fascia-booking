@@ -1,397 +1,429 @@
 "use client";
 
-import { useState } from "react";
-import { useAdmin } from "@/lib/adminContext";
-import { ADMIN_SERVICES, ADMIN_STAFF, ADMIN_STORES, AdminService } from "@/lib/adminMockData";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/lib/supabase";
 
-const DURATIONS = [20, 50, 60, 90, 120];
+const LEVELS = ["技術長", "資深職人", "進階職人", "初階職人", "準師"] as const;
+const CATEGORIES = [
+  { value: "fascia", label: "筋膜調理" },
+  { value: "training", label: "訓練課程" },
+  { value: "addon", label: "加購項目" },
+] as const;
 
-type AddStep = "name" | "duration" | "price" | "confirm_price" | "preview";
+interface Service {
+  id: string;
+  name: string;
+  duration: number;
+  category: string;
+  is_addon: boolean;
+  online_bookable: boolean;
+  active: boolean;
+  sort_order: number;
+  prices: Record<string, { regular: number; member: number }>;
+  staffIds: string[];
+}
+
+interface StaffProfile {
+  id: string;
+  name: string;
+  branch_id: string | null;
+}
+
+const BRANCH_NAMES: Record<string, string> = {
+  ST01: "小巨蛋",
+  ST02: "大安",
+  ST03: "板橋",
+};
+
+function emptyPrices() {
+  const p: Record<string, { regular: number; member: number }> = {};
+  LEVELS.forEach(l => { p[l] = { regular: 0, member: 0 }; });
+  return p;
+}
 
 export default function ServicesPage() {
-  const { user } = useAdmin();
-  const router = useRouter();
-  const [services, setServices] = useState<AdminService[]>(ADMIN_SERVICES);
-  const [showAddFlow, setShowAddFlow] = useState(false);
-  const [addStep, setAddStep] = useState<AddStep>("name");
-  const [newService, setNewService] = useState<Partial<AdminService>>({ duration: 60 });
-  const [priceConfirm, setPriceConfirm] = useState("");
-  const [priceError, setPriceError] = useState(false);
-  const [selectedStore, setSelectedStore] = useState("");
+  const [services, setServices] = useState<Service[]>([]);
+  const [staffList, setStaffList] = useState<StaffProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<Service | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  if (!user) return null;
-  if (user.role !== "管理者") {
-    return (
-      <div className="p-8 text-center text-[#8a7a6e]">
-        <p>無權限查看此頁面</p>
-        <button onClick={() => router.back()} className="mt-4 text-[#8b6748] text-sm">返回</button>
-      </div>
-    );
-  }
+  const [form, setForm] = useState({
+    id: "",
+    name: "",
+    duration: 60,
+    category: "fascia",
+    is_addon: false,
+    online_bookable: true,
+    active: true,
+    sort_order: 0,
+    prices: emptyPrices(),
+    staffIds: [] as string[],
+  });
 
-  const toggleEnabled = (id: string) => {
-    setServices(prev => prev.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s));
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    const [{ data: svcData }, { data: priceData }, { data: ssData }, { data: staffData }] = await Promise.all([
+      supabase.from("services").select("*").order("sort_order"),
+      supabase.from("service_prices").select("*"),
+      supabase.from("staff_services").select("*"),
+      supabase.from("staff_profiles").select("id,name,branch_id").order("name"),
+    ]);
+
+    setStaffList(staffData || []);
+
+    const svcs: Service[] = (svcData || []).map((s: Record<string, unknown>) => {
+      const prices = emptyPrices();
+      (priceData || []).filter((p: Record<string, unknown>) => p.service_id === s.id).forEach((p: Record<string, unknown>) => {
+        if (p.staff_level && typeof p.staff_level === "string") {
+          prices[p.staff_level] = {
+            regular: (p.price_regular as number) || 0,
+            member: (p.price_member as number) || 0,
+          };
+        }
+      });
+      const staffIds = (ssData || [])
+        .filter((ss: Record<string, unknown>) => ss.service_id === s.id)
+        .map((ss: Record<string, unknown>) => ss.staff_id as string);
+      return { ...s, prices, staffIds } as Service;
+    });
+
+    setServices(svcs);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const openAdd = () => {
+    setEditing(null);
+    setForm({
+      id: `svc-${Date.now()}`,
+      name: "",
+      duration: 60,
+      category: "fascia",
+      is_addon: false,
+      online_bookable: true,
+      active: true,
+      sort_order: services.length + 1,
+      prices: emptyPrices(),
+      staffIds: [],
+    });
+    setShowModal(true);
   };
 
-  const toggleOnlineBookable = (id: string) => {
-    setServices(prev => prev.map(s => s.id === id ? { ...s, onlineBookable: !s.onlineBookable } : s));
+  const openEdit = (svc: Service) => {
+    setEditing(svc);
+    setForm({
+      id: svc.id,
+      name: svc.name,
+      duration: svc.duration,
+      category: svc.category,
+      is_addon: svc.is_addon,
+      online_bookable: svc.online_bookable,
+      active: svc.active,
+      sort_order: svc.sort_order,
+      prices: { ...svc.prices },
+      staffIds: [...svc.staffIds],
+    });
+    setShowModal(true);
   };
 
-  const startAddFlow = () => {
-    setNewService({ duration: 60 });
-    setPriceConfirm("");
-    setPriceError(false);
-    setAddStep("name");
-    setShowAddFlow(true);
-  };
+  const handleSave = async () => {
+    if (!form.name.trim()) { alert("請輸入服務名稱"); return; }
+    setSaving(true);
 
-  const nextStep = () => {
-    if (addStep === "name") {
-      if (!newService.name?.trim()) return;
-      setAddStep("duration");
-    } else if (addStep === "duration") {
-      setAddStep("price");
-    } else if (addStep === "price") {
-      if (!newService.priceRegular || !newService.priceMember || !newService.priceJuniorRegular || !newService.priceInternRegular) return;
-      setPriceConfirm("");
-      setAddStep("confirm_price");
-    } else if (addStep === "confirm_price") {
-      if (String(priceConfirm) !== String(newService.priceRegular)) {
-        setPriceError(true);
-        return;
-      }
-      setPriceError(false);
-      setAddStep("preview");
+    const { error: svcErr } = await supabase.from("services").upsert({
+      id: form.id,
+      name: form.name,
+      duration: form.duration,
+      category: form.category,
+      is_addon: form.is_addon,
+      online_bookable: form.online_bookable,
+      active: form.active,
+      sort_order: form.sort_order,
+    });
+    if (svcErr) { alert("儲存失敗：" + svcErr.message); setSaving(false); return; }
+
+    await supabase.from("service_prices").delete().eq("service_id", form.id);
+    const priceRows = LEVELS.map(l => ({
+      service_id: form.id,
+      staff_level: l,
+      price_regular: form.prices[l]?.regular || 0,
+      price_member: form.prices[l]?.member || 0,
+    }));
+    await supabase.from("service_prices").insert(priceRows);
+
+    await supabase.from("staff_services").delete().eq("service_id", form.id);
+    if (form.staffIds.length > 0) {
+      await supabase.from("staff_services").insert(
+        form.staffIds.map(staffId => ({ staff_id: staffId, service_id: form.id }))
+      );
     }
+
+    setSaving(false);
+    setShowModal(false);
+    fetchData();
   };
 
-  const saveService = () => {
-    const id = `SV${String(services.length + 1).padStart(2, "0")}`;
-    setServices(prev => [...prev, { ...newService, id, enabled: false, onlineBookable: newService.onlineBookable ?? true } as AdminService]);
-    setShowAddFlow(false);
+  const handleToggleActive = async (svc: Service) => {
+    await supabase.from("services").update({ active: !svc.active }).eq("id", svc.id);
+    fetchData();
   };
 
-  const stepLabels: Record<AddStep, string> = {
-    name: "步驟 1/5：輸入服務名稱",
-    duration: "步驟 2/5：選擇服務時長",
-    price: "步驟 3/5：設定價格",
-    confirm_price: "步驟 4/5：再次確認定價",
-    preview: "步驟 5/5：預覽確認",
+  const toggleStaff = (id: string) => {
+    setForm(f => ({
+      ...f,
+      staffIds: f.staffIds.includes(id) ? f.staffIds.filter(x => x !== id) : [...f.staffIds, id],
+    }));
   };
 
-  const storeTabs = [{ id: "", name: "全部" }, ...ADMIN_STORES];
+  const groupedStaff = staffList.reduce<Record<string, StaffProfile[]>>((acc, s) => {
+    const branch = s.branch_id || "other";
+    if (!acc[branch]) acc[branch] = [];
+    acc[branch].push(s);
+    return acc;
+  }, {});
+
+  if (loading) return <div className="p-8 text-center text-sm text-gray-400">載入中...</div>;
 
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-xl font-semibold text-[#1c1c1c]">服務項目</h1>
-          <p className="text-sm text-[#8a7a6e] mt-1">共 {services.length} 項服務</p>
-        </div>
-        <button
-          onClick={startAddFlow}
-          className="px-4 py-2 bg-[#8b6748] text-white rounded-xl text-sm"
-        >
-          + 新增服務
-        </button>
-      </div>
-
-      {/* Store filter tabs */}
-      <div className="flex gap-2 mb-5">
-        {storeTabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setSelectedStore(tab.id)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors border ${
-              selectedStore === tab.id
-                ? "bg-[#8b6748] text-white border-[#8b6748]"
-                : "bg-white text-[#8a7a6e] border-[#e8ddd2]"
-            }`}
-          >
-            {tab.name}
-          </button>
-        ))}
-      </div>
-
-      <div className="space-y-3">
-        {services.map(s => (
-          <div key={s.id} className="bg-white rounded-2xl border border-[#e8ddd2] p-4">
-            <div className="flex items-start justify-between mb-2">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-medium text-[#1c1c1c]">{s.name}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full border ${
-                    s.enabled
-                      ? "bg-green-50 text-green-700 border-green-200"
-                      : "bg-gray-100 text-gray-500 border-gray-200"
-                  }`}>
-                    {s.enabled ? "啟用中" : "未啟用"}
-                  </span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full border ${
-                    s.onlineBookable
-                      ? "bg-blue-50 text-blue-700 border-blue-200"
-                      : "bg-gray-100 text-gray-400 border-gray-200"
-                  }`}>
-                    {s.onlineBookable ? "開放網路預約" : "僅現場預約"}
-                  </span>
-                </div>
-                <div className="text-xs text-[#8a7a6e]">時長：{s.duration} 分鐘</div>
-              </div>
-              <div className="flex flex-col gap-1 items-end">
-                <button
-                  onClick={() => toggleEnabled(s.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs border transition-colors ${
-                    s.enabled
-                      ? "bg-gray-100 text-gray-600 border-gray-200"
-                      : "bg-[#8b6748] text-white border-[#8b6748]"
-                  }`}
-                >
-                  {s.enabled ? "停用" : "啟用"}
-                </button>
-                <button
-                  onClick={() => toggleOnlineBookable(s.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs border transition-colors ${
-                    s.onlineBookable
-                      ? "bg-blue-100 text-blue-700 border-blue-200"
-                      : "bg-gray-100 text-gray-500 border-gray-200"
-                  }`}
-                >
-                  {s.onlineBookable ? "關閉網路預約" : "開放網路預約"}
-                </button>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-[#8a7a6e] mt-2">
-              <div>技師職人 一般：<span className="text-[#1c1c1c] font-medium">${s.priceRegular.toLocaleString()}</span></div>
-              <div>技師職人 會員：<span className="text-[#8b6748] font-medium">${s.priceMember.toLocaleString()}</span></div>
-              <div>技術長 一般：<span className="text-[#1c1c1c] font-medium">${s.priceSeniorRegular.toLocaleString()}</span></div>
-              <div>技術長 會員：<span className="text-[#8b6748] font-medium">${s.priceSeniorMember.toLocaleString()}</span></div>
-              <div>準技師 一般：<span className="text-[#1c1c1c] font-medium">${s.priceJuniorRegular.toLocaleString()}</span></div>
-              <div>準技師 會員：<span className="text-[#8b6748] font-medium">${s.priceJuniorMember.toLocaleString()}</span></div>
-              <div>實習技師 一般：<span className="text-[#1c1c1c] font-medium">${s.priceInternRegular.toLocaleString()}</span></div>
-              <div>實習技師 會員：<span className="text-[#8b6748] font-medium">${s.priceInternMember.toLocaleString()}</span></div>
-              <div>特約廠商：<span className="text-purple-600 font-medium">${s.priceVendor.toLocaleString()}</span></div>
-              <div>親友價：<span className="text-blue-600 font-medium">${s.priceFriend.toLocaleString()}</span></div>
-            </div>
-            {/* 可執行老師 */}
-            <div className="mt-3 pt-3 border-t border-[#f0e8df]">
-              <div className="text-xs text-[#8a7a6e] mb-1">
-                可執行老師
-                {selectedStore !== "" && (
-                  <span className="ml-1 text-[#8b6748]">
-                    （{ADMIN_STORES.find(st => st.id === selectedStore)?.name}）
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {ADMIN_STAFF.filter(st => st.allowedServiceIds.includes(s.id) && (selectedStore === "" || st.storeId === selectedStore)).map(st => (
-                  <span key={st.id} className="text-xs px-2 py-0.5 bg-[#faf7f2] text-[#8b6748] rounded-full border border-[#e8ddd2]">
-                    {st.name}
-                  </span>
-                ))}
-                {ADMIN_STAFF.filter(st => st.allowedServiceIds.includes(s.id) && (selectedStore === "" || st.storeId === selectedStore)).length === 0 && (
-                  <span className="text-xs text-[#c0b5ac]">此門市尚無可執行老師</span>
-                )}
-              </div>
-            </div>
+    <div className="min-h-screen bg-[#faf7f2]">
+      <div className="max-w-3xl mx-auto px-4 py-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <p className="text-[10px] tracking-[0.2em] text-[#8b6748] uppercase">FASCIA 法夏</p>
+            <h1 className="text-lg font-semibold text-[#1c1c1c]">服務項目管理</h1>
           </div>
-        ))}
+          <button
+            onClick={openAdd}
+            className="px-4 py-2 bg-[#8b6748] text-white text-sm rounded-lg"
+          >
+            + 新增服務
+          </button>
+        </div>
+
+        {services.length === 0 ? (
+          <div className="bg-white rounded-xl p-8 text-center text-sm text-gray-400 border border-[#e8ddd2]">
+            尚無服務項目，請先在 Supabase 執行 supabase/services_schema.sql
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {services.map(svc => (
+              <div key={svc.id} className={`bg-white rounded-xl p-4 border border-[#e8ddd2] ${!svc.active ? "opacity-50" : ""}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-[#1c1c1c]">{svc.name}</span>
+                      {svc.is_addon && (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">加購</span>
+                      )}
+                      {!svc.online_bookable && (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">僅內部</span>
+                      )}
+                      {!svc.active && (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-600 rounded">已停用</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-[#8a7a6e] mt-0.5">
+                      {CATEGORIES.find(c => c.value === svc.category)?.label}
+                      {svc.duration > 0 ? ` · ${svc.duration}分鐘` : ""}
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5">
+                      {LEVELS.filter(l => svc.prices[l]?.regular > 0).map(l => (
+                        <span key={l} className="text-xs text-gray-500">
+                          {l}: <span className="text-[#1c1c1c] font-medium">${svc.prices[l].regular.toLocaleString()}</span>
+                          {svc.prices[l].member !== svc.prices[l].regular && (
+                            <span className="text-amber-600"> / 會員${svc.prices[l].member.toLocaleString()}</span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="mt-1.5">
+                      {svc.staffIds.length === 0 ? (
+                        <p className="text-xs text-gray-400">全體技師</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {svc.staffIds.map(sid => {
+                            const s = staffList.find(x => x.id === sid);
+                            return s ? (
+                              <span key={sid} className="text-[10px] px-1.5 py-0.5 bg-[#f5f0e8] text-[#8b6748] rounded">
+                                {s.name}
+                              </span>
+                            ) : null;
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => openEdit(svc)}
+                      className="px-3 py-1.5 text-xs border border-[#e8ddd2] rounded-lg text-[#1c1c1c] hover:bg-[#f5f0e8]"
+                    >
+                      編輯
+                    </button>
+                    <button
+                      onClick={() => handleToggleActive(svc)}
+                      className={`px-3 py-1.5 text-xs rounded-lg ${svc.active ? "border border-red-200 text-red-600 hover:bg-red-50" : "border border-green-200 text-green-600 hover:bg-green-50"}`}
+                    >
+                      {svc.active ? "停用" : "啟用"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Add service modal - POS style防呆 flow */}
-      {showAddFlow && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <div className="text-xs text-[#8a7a6e] mb-1">{stepLabels[addStep]}</div>
-            <div className="w-full bg-[#e8ddd2] rounded-full h-1 mb-5">
-              <div
-                className="bg-[#8b6748] h-1 rounded-full transition-all"
-                style={{ width: `${(["name","duration","price","confirm_price","preview"].indexOf(addStep) + 1) * 20}%` }}
-              />
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-[#e8ddd2] px-5 py-4 flex items-center justify-between">
+              <h2 className="font-semibold text-[#1c1c1c]">{editing ? "編輯服務" : "新增服務"}</h2>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 text-xl leading-none">✕</button>
             </div>
 
-            {addStep === "name" && (
+            <div className="p-5 space-y-4">
               <div>
-                <label className="text-sm font-medium text-[#1c1c1c] mb-3 block">服務名稱</label>
+                <label className="block text-xs text-[#8a7a6e] mb-1">服務名稱</label>
                 <input
-                  autoFocus
-                  value={newService.name || ""}
-                  onChange={e => setNewService(p => ({ ...p, name: e.target.value }))}
-                  placeholder="例：全身筋膜舒壓"
-                  className="w-full px-3 py-3 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
+                  value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  className="w-full border border-[#e8ddd2] rounded-lg px-3 py-2 text-sm outline-none focus:border-[#8b6748]"
+                  placeholder="例：精緻筋膜調理"
                 />
               </div>
-            )}
 
-            {addStep === "duration" && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-[#8a7a6e] mb-1">時長（分鐘）</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={form.duration}
+                    onChange={e => setForm(f => ({ ...f, duration: parseInt(e.target.value) || 0 }))}
+                    className="w-full border border-[#e8ddd2] rounded-lg px-3 py-2 text-sm outline-none focus:border-[#8b6748]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-[#8a7a6e] mb-1">類別</label>
+                  <select
+                    value={form.category}
+                    onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                    className="w-full border border-[#e8ddd2] rounded-lg px-3 py-2 text-sm outline-none focus:border-[#8b6748]"
+                  >
+                    {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.is_addon}
+                    onChange={e => setForm(f => ({ ...f, is_addon: e.target.checked }))}
+                    className="w-4 h-4 accent-[#8b6748]"
+                  />
+                  加購項目
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.online_bookable}
+                    onChange={e => setForm(f => ({ ...f, online_bookable: e.target.checked }))}
+                    className="w-4 h-4 accent-[#8b6748]"
+                  />
+                  開放線上預約
+                </label>
+              </div>
+
               <div>
-                <label className="text-sm font-medium text-[#1c1c1c] mb-3 block">服務時長</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {DURATIONS.map(d => (
-                    <button
-                      key={d}
-                      onClick={() => setNewService(p => ({ ...p, duration: d }))}
-                      className={`py-3 rounded-xl text-sm border transition-colors ${
-                        newService.duration === d
-                          ? "bg-[#8b6748] text-white border-[#8b6748]"
-                          : "bg-[#faf7f2] text-[#1c1c1c] border-[#e8ddd2]"
-                      }`}
-                    >
-                      {d} 分鐘
-                    </button>
+                <label className="block text-xs text-[#8a7a6e] mb-2">各等級價格（一般 / 會員）</label>
+                <div className="space-y-2">
+                  {LEVELS.map(level => (
+                    <div key={level} className="flex items-center gap-2">
+                      <span className="text-xs text-[#1c1c1c] w-20 flex-shrink-0">{level}</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={form.prices[level]?.regular || ""}
+                        onChange={e => setForm(f => ({
+                          ...f,
+                          prices: { ...f.prices, [level]: { ...f.prices[level], regular: parseInt(e.target.value) || 0 } }
+                        }))}
+                        placeholder="一般價"
+                        className="flex-1 border border-[#e8ddd2] rounded-lg px-2 py-1.5 text-sm outline-none focus:border-[#8b6748]"
+                      />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={form.prices[level]?.member || ""}
+                        onChange={e => setForm(f => ({
+                          ...f,
+                          prices: { ...f.prices, [level]: { ...f.prices[level], member: parseInt(e.target.value) || 0 } }
+                        }))}
+                        placeholder="會員價"
+                        className="flex-1 border border-[#e8ddd2] rounded-lg px-2 py-1.5 text-sm outline-none focus:border-[#8b6748]"
+                      />
+                    </div>
                   ))}
                 </div>
               </div>
-            )}
 
-            {addStep === "price" && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-[#1c1c1c] block">設定各級定價</label>
-                <div className="flex items-center justify-between py-2 px-3 bg-[#faf7f2] rounded-xl border border-[#e8ddd2]">
-                  <span className="text-xs text-[#8a7a6e]">開放網路預約</span>
-                  <button
-                    type="button"
-                    onClick={() => setNewService(p => ({ ...p, onlineBookable: !p.onlineBookable }))}
-                    className={`w-10 h-5 rounded-full transition-colors relative ${newService.onlineBookable ? "bg-blue-500" : "bg-gray-300"}`}
-                  >
-                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${newService.onlineBookable ? "translate-x-5" : "translate-x-0.5"}`} />
-                  </button>
-                </div>
-                {[
-                  { label: "技師職人 一般價", field: "priceRegular" },
-                  { label: "技師職人 會員價", field: "priceMember" },
-                  { label: "技術長 一般價", field: "priceSeniorRegular" },
-                  { label: "技術長 會員價", field: "priceSeniorMember" },
-                  { label: "準技師 一般價", field: "priceJuniorRegular" },
-                  { label: "準技師 會員價", field: "priceJuniorMember" },
-                  { label: "實習技師 一般價", field: "priceInternRegular" },
-                  { label: "實習技師 會員價", field: "priceInternMember" },
-                  { label: "特約廠商價", field: "priceVendor" },
-                  { label: "親友價", field: "priceFriend" },
-                ].map(({ label, field }) => (
-                  <div key={field}>
-                    <label className="text-xs text-[#8a7a6e] mb-1 block">{label}</label>
-                    <input
-                      type="number"
-                      value={(newService as Record<string, unknown>)[field] as number || ""}
-                      onChange={e => setNewService(p => ({ ...p, [field]: Number(e.target.value) }))}
-                      placeholder="輸入金額"
-                      className="w-full px-3 py-2 border border-[#e8ddd2] rounded-xl text-sm focus:outline-none focus:border-[#8b6748]"
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {addStep === "confirm_price" && (
               <div>
-                <label className="text-sm font-medium text-[#1c1c1c] mb-1 block">再次輸入一般定價確認</label>
-                <p className="text-xs text-[#8a7a6e] mb-3">請再次輸入技師職人一般價 ${newService.priceRegular?.toLocaleString()} 以確認</p>
+                <label className="block text-xs text-[#8a7a6e] mb-1">
+                  指定技師（不選 = 全體技師皆可）
+                </label>
+                <div className="border border-[#e8ddd2] rounded-lg p-3 space-y-3">
+                  {Object.entries(groupedStaff).map(([branchId, staffMembers]) => (
+                    <div key={branchId}>
+                      <p className="text-[10px] text-[#8a7a6e] uppercase tracking-wider mb-1.5">
+                        {BRANCH_NAMES[branchId] || "跨店"}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {staffMembers.map(s => (
+                          <button
+                            key={s.id}
+                            onClick={() => toggleStaff(s.id)}
+                            className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                              form.staffIds.includes(s.id)
+                                ? "bg-[#8b6748] border-[#8b6748] text-white"
+                                : "border-[#e8ddd2] text-[#1c1c1c] hover:border-[#8b6748]"
+                            }`}
+                          >
+                            {s.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-[#8a7a6e] mb-1">排列順序</label>
                 <input
-                  autoFocus
-                  type="number"
-                  value={priceConfirm}
-                  onChange={e => { setPriceConfirm(e.target.value); setPriceError(false); }}
-                  placeholder="再次輸入定價"
-                  className={`w-full px-3 py-3 border rounded-xl text-sm focus:outline-none ${
-                    priceError ? "border-red-400 focus:border-red-400" : "border-[#e8ddd2] focus:border-[#8b6748]"
-                  }`}
+                  type="text"
+                  inputMode="numeric"
+                  value={form.sort_order}
+                  onChange={e => setForm(f => ({ ...f, sort_order: parseInt(e.target.value) || 0 }))}
+                  className="w-24 border border-[#e8ddd2] rounded-lg px-3 py-2 text-sm outline-none focus:border-[#8b6748]"
                 />
-                {priceError && <p className="text-red-500 text-xs mt-1">價格不符，請重新輸入</p>}
               </div>
-            )}
+            </div>
 
-            {addStep === "preview" && (
-              <div>
-                <label className="text-sm font-medium text-[#1c1c1c] mb-3 block">確認新增以下服務</label>
-                <div className="bg-[#faf7f2] rounded-xl p-4 space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-[#8a7a6e]">服務名稱</span>
-                    <span className="font-medium text-[#1c1c1c]">{newService.name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#8a7a6e]">時長</span>
-                    <span className="text-[#1c1c1c]">{newService.duration} 分鐘</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#8a7a6e]">技師職人 一般</span>
-                    <span className="text-[#1c1c1c]">${newService.priceRegular?.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#8a7a6e]">技師職人 會員</span>
-                    <span className="text-[#8b6748]">${newService.priceMember?.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#8a7a6e]">技術長 一般</span>
-                    <span className="text-[#1c1c1c]">${newService.priceSeniorRegular?.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#8a7a6e]">技術長 會員</span>
-                    <span className="text-[#8b6748]">${newService.priceSeniorMember?.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#8a7a6e]">準技師 一般</span>
-                    <span className="text-[#1c1c1c]">${newService.priceJuniorRegular?.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#8a7a6e]">準技師 會員</span>
-                    <span className="text-[#8b6748]">${newService.priceJuniorMember?.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#8a7a6e]">實習技師 一般</span>
-                    <span className="text-[#1c1c1c]">${newService.priceInternRegular?.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#8a7a6e]">實習技師 會員</span>
-                    <span className="text-[#8b6748]">${newService.priceInternMember?.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#8a7a6e]">特約廠商</span>
-                    <span className="text-purple-600">${newService.priceVendor?.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#8a7a6e]">親友價</span>
-                    <span className="text-blue-600">${newService.priceFriend?.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#8a7a6e]">網路預約</span>
-                    <span className={newService.onlineBookable ? "text-blue-600" : "text-gray-500"}>{newService.onlineBookable ? "開放" : "僅現場"}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#8a7a6e]">狀態</span>
-                    <span className="text-gray-500">未啟用（可稍後手動啟用）</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-3 mt-5">
+            <div className="sticky bottom-0 bg-white border-t border-[#e8ddd2] px-5 py-4">
               <button
-                onClick={() => {
-                  if (addStep === "name") { setShowAddFlow(false); return; }
-                  const steps: AddStep[] = ["name", "duration", "price", "confirm_price", "preview"];
-                  const idx = steps.indexOf(addStep);
-                  setAddStep(steps[idx - 1]);
-                }}
-                className="flex-1 py-2.5 border border-[#e8ddd2] rounded-xl text-sm text-[#8a7a6e]"
+                onClick={handleSave}
+                disabled={saving}
+                className="w-full py-3 bg-[#8b6748] text-white text-sm font-medium rounded-xl disabled:opacity-60"
               >
-                {addStep === "name" ? "取消" : "上一步"}
+                {saving ? "儲存中..." : "儲存"}
               </button>
-              {addStep !== "preview" ? (
-                <button
-                  onClick={nextStep}
-                  className="flex-1 py-2.5 bg-[#8b6748] text-white rounded-xl text-sm"
-                >
-                  下一步
-                </button>
-              ) : (
-                <button
-                  onClick={saveService}
-                  className="flex-1 py-2.5 bg-[#8b6748] text-white rounded-xl text-sm"
-                >
-                  確認新增
-                </button>
-              )}
             </div>
           </div>
         </div>

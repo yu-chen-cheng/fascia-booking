@@ -141,7 +141,7 @@ export default function ProfilePage() {
       <BookingHeader
         title="我的帳戶"
         subtitle="會員資料與紀錄"
-        onBack={() => router.push("/booking/store")}
+        onBack={() => router.replace("/booking/store")}
         step={0}
       />
 
@@ -228,7 +228,7 @@ export default function ProfilePage() {
           {menuItems.map((item, idx) => (
             <button
               key={item.label}
-              onClick={() => router.push(item.href)}
+              onClick={() => router.replace(item.href)}
               className={`w-full flex items-center gap-4 px-5 py-4 hover:bg-[#fafaf8] transition-colors text-left ${
                 idx < menuItems.length - 1 ? "border-b border-gray-50" : ""
               }`}
@@ -256,7 +256,7 @@ export default function ProfilePage() {
 
         {/* Book CTA */}
         <button
-          onClick={() => router.push("/booking/store")}
+          onClick={() => router.replace("/booking/store")}
           className="w-full py-4 bg-[#b8956a] text-white rounded-2xl font-medium text-sm shadow-md shadow-[#b8956a]/20 hover:bg-[#a07d58] transition-colors"
         >
           立即預約調理

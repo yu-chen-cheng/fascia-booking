@@ -39,6 +39,7 @@ interface StaffProfile {
   position_allowance: number;
   session_threshold: number;
   is_active: boolean;
+  sort_order: number;
 }
 
 // commission_rates 儲存結構: { [level]: { [service_key]: amount } }
@@ -82,7 +83,7 @@ export default function StaffPage() {
   async function fetchData() {
     setLoading(true);
     const [{ data: staff }, { data: rates }] = await Promise.all([
-      supabase.from("staff_profiles").select("id,email,name,branch_id,role,level,employment_type,base_salary,position_allowance,session_threshold,is_active").order("name"),
+      supabase.from("staff_profiles").select("id,email,name,branch_id,role,level,employment_type,base_salary,position_allowance,session_threshold,is_active,sort_order").order("name"),
       supabase.from("commission_rates").select("employment_type,level,service_key,amount"),
     ]);
 
@@ -150,7 +151,11 @@ export default function StaffPage() {
       setShowAddModal(false);
       setNewStaff(EMPTY_STAFF);
     } else {
-      alert("新增失敗：" + error.message);
+      if (error.message.includes("duplicate key") || error.message.includes("unique constraint")) {
+        alert(`新增失敗：此信箱 ${newStaff.email} 已有帳號，請直接在員工列表中編輯，或使用不同的信箱。`);
+      } else {
+        alert("新增失敗：" + error.message);
+      }
     }
     setSaving(false);
   };
@@ -178,6 +183,21 @@ export default function StaffPage() {
   const handleDeactivate = async (id: string) => {
     if (!confirm("確定要停用此員工帳號？")) return;
     await supabase.from("staff_profiles").update({ is_active: false }).eq("id", id);
+    await fetchData();
+  };
+
+  const moveStaff = async (index: number, direction: "up" | "down") => {
+    const list = filteredStaff;
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= list.length) return;
+    const a = list[index];
+    const b = list[targetIndex];
+    const aOrder = a.sort_order ?? index;
+    const bOrder = b.sort_order ?? targetIndex;
+    await Promise.all([
+      supabase.from("staff_profiles").update({ sort_order: bOrder }).eq("id", a.id),
+      supabase.from("staff_profiles").update({ sort_order: aOrder }).eq("id", b.id),
+    ]);
     await fetchData();
   };
 
@@ -340,9 +360,21 @@ export default function StaffPage() {
         <div className="text-center py-10 text-sm text-[#8a7a6e]">此分店尚無在職員工</div>
       ) : (
         <div className="space-y-3">
-          {filteredStaff.map(s => (
+          {filteredStaff.map((s, idx) => (
             <div key={s.id} className="bg-white rounded-2xl border border-[#e8ddd2] p-4">
               <div className="flex items-start justify-between">
+                <div className="flex flex-col gap-1 mr-2 shrink-0">
+                  <button
+                    onClick={() => moveStaff(idx, "up")}
+                    disabled={idx === 0}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#e8ddd2] text-[#8a7a6e] disabled:opacity-20 hover:bg-[#faf7f2] transition-colors text-xs"
+                  >▲</button>
+                  <button
+                    onClick={() => moveStaff(idx, "down")}
+                    disabled={idx === filteredStaff.length - 1}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#e8ddd2] text-[#8a7a6e] disabled:opacity-20 hover:bg-[#faf7f2] transition-colors text-xs"
+                  >▼</button>
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <span className="text-sm font-semibold text-[#1c1c1c]">{s.name}</span>

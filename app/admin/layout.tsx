@@ -6,10 +6,35 @@ import { useEffect } from "react";
 import Link from "next/link";
 
 const BRANCHES = [
-  { id: "ST01", name: "小巨蛋店" },
-  { id: "ST02", name: "大安店" },
-  { id: "ST03", name: "板橋店" },
+  { id: "ST01", name: "小巨蛋" },
+  { id: "ST02", name: "大安" },
+  { id: "ST03", name: "板橋" },
 ];
+
+// Nav definition per role
+function getNav(role: string) {
+  const base = [
+    { href: "/admin/bookings",  label: "預約", icon: "📅" },
+    { href: "/admin/schedule",  label: "排班", icon: "🗓" },
+    { href: "/admin/cashout",   label: "結帳", icon: "💴" },
+  ];
+  if (role === "店長") return [
+    ...base,
+    { href: "/admin/customers", label: "會員", icon: "👤" },
+  ];
+  if (role === "管理者") return [
+    ...base,
+    { href: "/admin/customers", label: "會員", icon: "👤" },
+    { href: "/admin/reports",   label: "報表", icon: "📊" },
+    { href: "/admin/settings",  label: "設定", icon: "⚙️" },
+  ];
+  // 店員 — 結帳改為業績（個人報表）
+  return [
+    { href: "/admin/bookings",  label: "預約", icon: "📅" },
+    { href: "/admin/schedule",  label: "排班", icon: "🗓" },
+    { href: "/admin/my-report", label: "業績", icon: "📊" },
+  ];
+}
 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const { user, isLoading, logout, activeBranchId, activeBranchName, setActiveBranch, canSwitchBranch } = useAdmin();
@@ -30,150 +55,134 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user || pathname === "/admin/login") {
-    return <>{children}</>;
-  }
+  if (!user || pathname === "/admin/login") return <>{children}</>;
 
-  const role = user.role;
-  const isAdmin = role === "管理者" || role === "會計";
-  const isManager = role === "店長";
-  const isAccountant = false; // 會計現在等同管理者權限
-
-  const navItems = [
-    { href: "/admin/dashboard", label: "首頁", icon: "⊞" },
-    ...(!(isAccountant) ? [
-      { href: "/admin/schedule", label: "排班", icon: "⊡" },
-      { href: "/admin/bookings", label: "預約", icon: "⊟" },
-    ] : []),
-    ...(isAdmin || isManager ? [{ href: "/admin/customers", label: "會員", icon: "◉" }] : []),
-    ...(isAdmin || isManager ? [{ href: "/admin/notifications", label: "通知", icon: "◈" }] : []),
-    ...(isAdmin || isManager || isAccountant ? [
-      { href: "/admin/cashout", label: "結帳", icon: "💴" },
-      { href: "/admin/reports", label: "報表", icon: "▦" },
-      { href: "/admin/expenses", label: "費用", icon: "₩" },
-    ] : []),
-    ...(isAdmin || isManager ? [
-      { href: "/admin/attendance", label: "打卡", icon: "⏱" },
-    ] : []),
-    ...(isAdmin ? [
-      { href: "/admin/staff", label: "員工", icon: "◎" },
-      { href: "/admin/services", label: "服務", icon: "◇" },
-      { href: "/admin/inventory", label: "貨物", icon: "◻" },
-    ] : []),
-  ];
-
-  const settingsItems = isAdmin ? [
-    { href: "/admin/cashout", label: "每日結帳" },
-    { href: "/admin/attendance", label: "打卡薪資" },
-    { href: "/admin/staff", label: "員工管理" },
-    { href: "/admin/services", label: "服務項目" },
-    { href: "/admin/reports", label: "業績報表" },
-    { href: "/admin/expenses", label: "費用管理" },
-    { href: "/admin/inventory", label: "貨物管理" },
-    { href: "/admin/notifications", label: "通知設定" },
-  ] : isManager ? [
-    { href: "/admin/cashout", label: "每日結帳" },
-    { href: "/admin/attendance", label: "打卡薪資" },
-    { href: "/admin/reports", label: "業績報表" },
-    { href: "/admin/expenses", label: "費用管理" },
-    { href: "/admin/notifications", label: "通知設定" },
-  ] : isAccountant ? [
-    { href: "/admin/cashout", label: "每日結帳" },
-    { href: "/admin/reports", label: "業績報表" },
-    { href: "/admin/expenses", label: "費用管理" },
-  ] : [];
+  const navItems = getNav(user.role);
+  const isAdmin = user.role === "管理者";
 
   return (
     <div className="min-h-screen bg-[#faf7f2] flex">
-      {/* Side nav - tablet/desktop */}
-      <aside className="hidden md:flex flex-col w-56 bg-white border-r border-[#e8ddd2] min-h-screen fixed top-0 left-0 z-20">
-        <div className="px-5 py-6 border-b border-[#e8ddd2]">
+
+      {/* ── Desktop sidebar ─────────────────────────────── */}
+      <aside className="hidden md:flex flex-col w-52 bg-white border-r border-[#e8ddd2] min-h-screen fixed top-0 left-0 z-20">
+
+        {/* Logo */}
+        <div className="px-5 py-5 border-b border-[#e8ddd2]">
           <div className="text-[#8b6748] font-semibold text-sm tracking-widest">FASCIA 法夏</div>
-          <div className="text-xs text-[#8a7a6e] mt-1">後台管理系統</div>
+          <div className="text-[10px] text-[#8a7a6e] mt-0.5">後台管理系統</div>
         </div>
-        <nav className="flex-1 py-4 px-3 space-y-1">
-          {[
-            { href: "/admin/dashboard", label: "首頁總覽" },
-            { href: "/admin/schedule", label: "排班管理" },
-            { href: "/admin/bookings", label: "預約管理" },
-            ...(isAdmin || isManager ? [{ href: "/admin/customers", label: "會員管理" }] : []),
-            ...settingsItems,
-          ].map(item => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
-                pathname === item.href
-                  ? "bg-[#8b6748] text-white"
-                  : "text-[#1c1c1c] hover:bg-[#faf7f2]"
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="px-4 py-4 border-t border-[#e8ddd2]">
-          <div className="text-xs font-medium text-[#1c1c1c]">{user.name}</div>
-          <div className="text-xs text-[#8b6748] mt-0.5">{user.role}</div>
-          {/* 分店切換（管理者/會計才顯示） */}
-          {canSwitchBranch ? (
-            <div className="mt-2 space-y-1">
+
+        {/* Branch switcher — 管理者 only */}
+        {isAdmin && (
+          <div className="px-3 py-3 border-b border-[#e8ddd2]">
+            <div className="text-[10px] text-[#8a7a6e] mb-1.5 px-1">分店</div>
+            <div className="flex gap-1">
               {BRANCHES.map(b => (
-                <button key={b.id} onClick={() => setActiveBranch(b.id)}
-                  className={`w-full text-left px-2 py-1 rounded-lg text-xs transition-colors ${
+                <button
+                  key={b.id}
+                  onClick={() => setActiveBranch(b.id)}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                     activeBranchId === b.id
                       ? "bg-[#8b6748] text-white"
-                      : "text-[#8a7a6e] hover:bg-[#faf7f2]"
-                  }`}>
+                      : "text-[#8a7a6e] hover:bg-[#faf7f2] border border-[#e8ddd2]"
+                  }`}
+                >
                   {b.name}
                 </button>
               ))}
             </div>
-          ) : (
-            <div className="text-xs text-[#8a7a6e] mt-0.5">{activeBranchName}</div>
-          )}
+          </div>
+        )}
+
+        {/* Nav links */}
+        <nav className="flex-1 py-3 px-3 space-y-0.5">
+          {navItems.map(item => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                pathname.startsWith(item.href)
+                  ? "bg-[#8b6748] text-white"
+                  : "text-[#1c1c1c] hover:bg-[#faf7f2]"
+              }`}
+            >
+              <span className="text-base leading-none">{item.icon}</span>
+              <span>{item.label}</span>
+            </Link>
+          ))}
+        </nav>
+
+        {/* User info */}
+        <div className="px-4 py-4 border-t border-[#e8ddd2]">
+          <div className="text-xs font-medium text-[#1c1c1c]">{user.name}</div>
+          <div className="text-[10px] text-[#8b6748] mt-0.5">
+            {user.role}
+            {!isAdmin && ` · ${activeBranchName}`}
+          </div>
           <button
             onClick={() => { logout(); router.replace("/admin/login"); }}
-            className="text-xs text-[#8a7a6e] hover:text-[#8b6748] transition-colors mt-3 block"
+            className="text-[10px] text-[#8a7a6e] hover:text-[#8b6748] transition-colors mt-2 block"
           >
             登出
           </button>
         </div>
       </aside>
 
-      {/* Main content */}
-      <div className="flex-1 md:ml-56 flex flex-col min-h-screen">
-        {/* Top bar mobile */}
-        <header className="md:hidden bg-white border-b border-[#e8ddd2] px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-          <div>
-            <div className="text-[#8b6748] font-semibold text-sm">FASCIA 法夏</div>
-            <div className="text-xs text-[#8a7a6e]">{user.name} · {user.role} · {activeBranchName}</div>
+      {/* ── Main content ─────────────────────────────────── */}
+      <div className="flex-1 md:ml-52 flex flex-col min-h-screen">
+
+        {/* Mobile top bar */}
+        <header className="md:hidden bg-white border-b border-[#e8ddd2] px-4 py-3 sticky top-0 z-10">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-[#8b6748] font-semibold text-sm">FASCIA 法夏</div>
+              <div className="text-[10px] text-[#8a7a6e]">{user.name} · {user.role}</div>
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Branch switcher pill — 管理者 mobile */}
+              {isAdmin && (
+                <div className="flex gap-1">
+                  {BRANCHES.map(b => (
+                    <button
+                      key={b.id}
+                      onClick={() => setActiveBranch(b.id)}
+                      className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                        activeBranchId === b.id
+                          ? "bg-[#8b6748] text-white"
+                          : "text-[#8a7a6e] border border-[#e8ddd2]"
+                      }`}
+                    >
+                      {b.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => { logout(); router.replace("/admin/login"); }}
+                className="text-[10px] text-[#8a7a6e] border border-[#e8ddd2] px-2.5 py-1 rounded-full"
+              >
+                登出
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => { logout(); router.replace("/admin/login"); }}
-            className="text-xs text-[#8a7a6e] border border-[#e8ddd2] px-3 py-1 rounded-full"
-          >
-            登出
-          </button>
         </header>
 
-        {/* Page content */}
         <main className="flex-1 pb-20 md:pb-0">
           {children}
         </main>
 
-        {/* Bottom tab bar mobile */}
+        {/* Mobile bottom tab bar */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[#e8ddd2] z-20">
           <div className="flex">
-            {navItems.slice(0, 5).map(item => (
+            {navItems.map(item => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex-1 flex flex-col items-center py-2 text-xs transition-colors ${
-                  pathname === item.href ? "text-[#8b6748]" : "text-[#8a7a6e]"
+                className={`flex-1 flex flex-col items-center py-2 text-[10px] transition-colors ${
+                  pathname.startsWith(item.href) ? "text-[#8b6748]" : "text-[#8a7a6e]"
                 }`}
               >
-                <span className="text-lg leading-none mb-0.5">{item.icon}</span>
+                <span className="text-xl leading-none mb-0.5">{item.icon}</span>
                 <span>{item.label}</span>
               </Link>
             ))}

@@ -354,7 +354,7 @@ export default function ProductsPage() {
       <BookingHeader
         title="法夏嚴選"
         subtitle="技師推薦 · 居家保養好物"
-        onBack={() => router.back()}
+        onBack={() => router.push("/booking/profile")}
         step={0}
       />
 

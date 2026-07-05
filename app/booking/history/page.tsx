@@ -63,35 +63,39 @@ export default function HistoryPage() {
       const days = ["日", "一", "二", "三", "四", "五", "六"];
       const dateStr = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}（${days[d.getDay()]}）`;
 
+      // 取得 oa_user_id（用來發送 LINE 推播）
+      const customer = await getCustomerByLineId(user.id);
+      const notifyUserId = customer?.oa_user_id || user.id;
+
       // LINE 取消通知
       await fetch("/api/line-notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          lineUserId: user.id,
+          lineUserId: notifyUserId,
           messages: [{
             type: "flex",
             altText: `預約取消通知 - ${dateStr} ${booking.time_slot}`,
             contents: {
               type: "bubble",
-              styles: { header: { backgroundColor: "#888888" }, body: { backgroundColor: "#faf7f2" } },
               header: {
                 type: "box", layout: "vertical",
+                backgroundColor: "#888888",
+                paddingAll: "lg",
                 contents: [
                   { type: "text", text: "FASCIA 法夏・筋膜結構美學", color: "#cccccc", size: "xs", weight: "bold", align: "center" },
                   { type: "text", text: "預約取消通知", color: "#ffffff", size: "lg", weight: "bold", align: "center", margin: "sm" },
                 ],
-                paddingAll: "lg",
               },
               body: {
                 type: "box", layout: "vertical", spacing: "md", paddingAll: "lg",
+                backgroundColor: "#faf7f2",
                 contents: [
                   { type: "text", text: `${user.name} 您好，您的預約已取消。`, size: "sm", color: "#1c1c1c", weight: "bold" },
                   { type: "separator", margin: "md", color: "#e8ddd2" },
-                  { type: "box", layout: "horizontal", spacing: "md", contents: [
-                    { type: "text", text: "📅", size: "sm", flex: 0 },
+                  { type: "box", layout: "horizontal", spacing: "md", margin: "md", contents: [
                     { type: "text", text: "日期時間", size: "sm", color: "#8a7a6e", flex: 2 },
-                    { type: "text", text: `${dateStr}  ${booking.time_slot}`, size: "sm", color: "#1c1c1c", weight: "bold", flex: 4, wrap: true },
+                    { type: "text", text: `${dateStr} ${booking.time_slot}`, size: "sm", color: "#1c1c1c", weight: "bold", flex: 4, wrap: true },
                   ]},
                   { type: "text", text: "如需重新預約，歡迎再次使用線上預約系統。", size: "xs", color: "#8a7a6e", wrap: true, margin: "md" },
                 ],
@@ -99,7 +103,7 @@ export default function HistoryPage() {
             },
           }],
         }),
-      }).catch(() => {});
+      }).catch(err => console.error("LINE cancel notify error:", err));
 
       // Email 取消通知
       if (user.email) {
@@ -141,7 +145,7 @@ export default function HistoryPage() {
         title="我的預約"
         subtitle="查看及管理預約紀錄"
         showBack
-        onBack={() => router.push("/booking/profile")}
+        onBack={() => router.replace("/booking/profile")}
       />
 
       <div className="flex-1 px-4 py-5 space-y-4">
@@ -151,7 +155,7 @@ export default function HistoryPage() {
           <div className="text-center py-16">
             <p className="text-sm text-gray-400 mb-4">尚無預約紀錄</p>
             <button
-              onClick={() => router.push("/booking/store")}
+              onClick={() => router.replace("/booking/store")}
               className="px-6 py-3 bg-[#8b6748] text-white rounded-2xl text-sm font-medium"
             >
               立即預約
@@ -246,7 +250,7 @@ export default function HistoryPage() {
                 <p className="text-xs text-gray-500 mt-0.5">選擇新的日期與時間</p>
               </div>
               <button
-                onClick={() => router.push("/booking/store")}
+                onClick={() => router.replace("/booking/store")}
                 className="px-4 py-2 bg-[#8b6748] text-white text-sm rounded-xl font-medium"
               >
                 立即預約

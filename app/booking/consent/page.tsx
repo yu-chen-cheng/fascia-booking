@@ -30,7 +30,7 @@ export default function ConsentPage() {
       <BookingHeader
         title="調理同意書"
         subtitle="請仔細閱讀以下內容"
-        onBack={() => router.back()}
+        onBack={() => router.push("/booking/register")}
         step={3}
       />
 

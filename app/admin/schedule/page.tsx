@@ -80,8 +80,9 @@ export default function SchedulePage() {
   const [selectedBranch, setSelectedBranch] = useState(user?.branchId ?? "ST01");
 
   // Modal state
-  const [modalDate, setModalDate] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [modalEvent, setModalEvent] = useState<ScheduleEvent | null>(null);
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [form, setForm] = useState<{
     event_type: EventType;
     start_time: string;
@@ -162,20 +163,20 @@ export default function SchedulePage() {
 
   const openAdd = (date: string) => {
     if (!isEditable) return;
-    // 管理者模式下必須先選人員
     if (isAdmin && !isStaff && !selectedStaffId) {
       alert("請先選擇員工後再新增事件");
       return;
     }
-    setModalDate(date);
     setModalEvent(null);
+    setSelectedDates([date]);
     setForm({ event_type: "早班", start_time: "10:00", end_time: "19:00", custom_label: "", blocks_booking: true });
+    setModalOpen(true);
   };
 
   const openEdit = (e: ScheduleEvent) => {
     if (!isEditable) return;
-    setModalDate(e.date);
     setModalEvent(e);
+    setSelectedDates([e.date]);
     setForm({
       event_type: e.event_type,
       start_time: e.start_time ?? "10:00",
@@ -183,32 +184,46 @@ export default function SchedulePage() {
       custom_label: e.custom_label ?? "",
       blocks_booking: e.blocks_booking,
     });
+    setModalOpen(true);
+  };
+
+  const toggleDate = (ymd: string) => {
+    setSelectedDates(prev =>
+      prev.includes(ymd) ? prev.filter(d => d !== ymd) : [...prev, ymd]
+    );
   };
 
   const handleSave = async () => {
-    if (!modalDate) return;
+    if (selectedDates.length === 0) return;
     setSaving(true);
     const staffId = isStaff ? user?.id : selectedStaffId;
     if (!staffId) { setSaving(false); return; }
 
-    const payload = {
-      staff_id: staffId,
-      branch_id: isStaff ? user?.branchId : selectedBranch,
-      date: modalDate,
-      event_type: form.event_type,
-      start_time: form.start_time || null,
-      end_time: form.end_time || null,
-      custom_label: form.event_type === "自訂" ? form.custom_label : null,
-      blocks_booking: form.blocks_booking,
-    };
-
     if (modalEvent) {
-      await supabase.from("schedules").update(payload).eq("id", modalEvent.id);
+      // Edit single event
+      await supabase.from("schedules").update({
+        event_type: form.event_type,
+        start_time: form.start_time || null,
+        end_time: form.end_time || null,
+        custom_label: form.event_type === "自訂" ? form.custom_label : null,
+        blocks_booking: form.blocks_booking,
+      }).eq("id", modalEvent.id);
     } else {
-      await supabase.from("schedules").insert(payload);
+      // Insert for all selected dates
+      const rows = selectedDates.map(date => ({
+        staff_id: staffId,
+        branch_id: isStaff ? user?.branchId : selectedBranch,
+        date,
+        event_type: form.event_type,
+        start_time: form.start_time || null,
+        end_time: form.end_time || null,
+        custom_label: form.event_type === "自訂" ? form.custom_label : null,
+        blocks_booking: form.blocks_booking,
+      }));
+      await supabase.from("schedules").insert(rows);
     }
     await fetchEvents();
-    setModalDate(null);
+    setModalOpen(false);
     setSaving(false);
   };
 
@@ -217,7 +232,7 @@ export default function SchedulePage() {
     setSaving(true);
     await supabase.from("schedules").delete().eq("id", modalEvent.id);
     await fetchEvents();
-    setModalDate(null);
+    setModalOpen(false);
     setSaving(false);
   };
 
@@ -372,15 +387,14 @@ export default function SchedulePage() {
       )}
 
       {/* Add/Edit Modal */}
-      {modalDate && (
+      {modalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <h3 className="text-base font-medium text-[#1c1c1c] mb-1">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
+            <h3 className="text-base font-medium text-[#1c1c1c] mb-4">
               {modalEvent ? "編輯事件" : "新增事件"}
             </h3>
-            <p className="text-sm text-[#8a7a6e] mb-4">{modalDate.replace(/-/g, "/")}</p>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               {/* Event type */}
               <div>
                 <label className="text-xs text-[#8a7a6e] mb-1.5 block">事件類型</label>
@@ -436,15 +450,57 @@ export default function SchedulePage() {
                   <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.blocks_booking ? "translate-x-6" : "translate-x-1"}`} />
                 </div>
               </label>
+
+              {/* Multi-date selector (only for new events) */}
+              {!modalEvent && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs text-[#8a7a6e]">套用日期（可多選）</label>
+                    <span className="text-xs text-[#8b6748] font-medium">已選 {selectedDates.length} 天</span>
+                  </div>
+                  {/* Day headers */}
+                  <div className="grid grid-cols-7 mb-1">
+                    {DAY_NAMES.map((d, i) => (
+                      <div key={d} className={`text-center text-[10px] font-medium ${i === 0 ? "text-red-400" : i === 6 ? "text-blue-400" : "text-[#8a7a6e]"}`}>{d}</div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-7 gap-0.5">
+                    {/* Empty cells */}
+                    {Array.from({ length: firstDayOfWeek }).map((_, i) => <div key={`e-${i}`} />)}
+                    {days.map(day => {
+                      const ymd = toYMD(day);
+                      const isPast = ymd < todayYMD;
+                      const isSelected = selectedDates.includes(ymd);
+                      const colIdx = day.getDay();
+                      return (
+                        <button
+                          key={ymd}
+                          disabled={isPast}
+                          onClick={() => toggleDate(ymd)}
+                          className={`aspect-square rounded-lg text-xs font-medium transition-colors flex items-center justify-center
+                            ${isPast ? "text-gray-300 cursor-default" :
+                              isSelected ? "bg-[#8b6748] text-white" :
+                              colIdx === 0 ? "text-red-400 hover:bg-red-50" :
+                              colIdx === 6 ? "text-blue-400 hover:bg-blue-50" :
+                              "text-[#1c1c1c] hover:bg-[#faf7f2]"
+                            }`}
+                        >
+                          {day.getDate()}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3 mt-5">
-              <button onClick={() => setModalDate(null)} className="flex-1 py-2.5 border border-[#e8ddd2] rounded-xl text-sm text-[#8a7a6e]">取消</button>
+              <button onClick={() => setModalOpen(false)} className="flex-1 py-2.5 border border-[#e8ddd2] rounded-xl text-sm text-[#8a7a6e]">取消</button>
               {modalEvent && (
                 <button onClick={handleDelete} disabled={saving} className="py-2.5 px-4 border border-red-200 text-red-500 rounded-xl text-sm">刪除</button>
               )}
-              <button onClick={handleSave} disabled={saving} className="flex-1 py-2.5 bg-[#8b6748] text-white rounded-xl text-sm disabled:opacity-50">
-                {saving ? "儲存中…" : "儲存"}
+              <button onClick={handleSave} disabled={saving || selectedDates.length === 0} className="flex-1 py-2.5 bg-[#8b6748] text-white rounded-xl text-sm disabled:opacity-50">
+                {saving ? "儲存中…" : modalEvent ? "儲存" : `儲存 ${selectedDates.length > 1 ? `(${selectedDates.length}天)` : ""}`}
               </button>
             </div>
           </div>

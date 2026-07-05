@@ -101,7 +101,10 @@ export default function LoginPage() {
         bookingHistory: [],
       });
       setConsentSigned(true);
-      router.push("/booking/store");
+      // Redirect back to where user was, or start at store
+      const returnTo = sessionStorage.getItem("fascia_return_to") || "/booking/store";
+      sessionStorage.removeItem("fascia_return_to");
+      router.push(returnTo);
     } else {
       // New user – pass LINE display name via sessionStorage for register page
       sessionStorage.setItem("liff_display_name", profile.displayName);
@@ -148,7 +151,9 @@ export default function LoginPage() {
         bookingHistory: [],
       });
       setConsentSigned(true);
-      router.push("/booking/store");
+      const returnTo = sessionStorage.getItem("fascia_return_to") || "/booking/store";
+      sessionStorage.removeItem("fascia_return_to");
+      router.push(returnTo);
     }
   };
 
@@ -180,8 +185,8 @@ export default function LoginPage() {
           <div className="space-y-2">
             {[
               "首次預約即享會員優惠價",
-              "儲值或累積消費滿 $15,000，自動升級長期會員優惠",
-              "累積滿 $30,000 贈送結構訓練一堂；滿 $50,000 贈送頻率檢測",
+              "累積消費滿 $30,000，自動升級長期會員優惠",
+              "一次儲值滿 $30,000 贈送結構訓練一堂；儲值 $50,000 再贈送頻率檢測一堂",
               "LINE 即時預約確認通知",
               "專屬調理紀錄與身體狀態追蹤",
             ].map((benefit) => (

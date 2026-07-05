@@ -42,14 +42,14 @@ export default function ServicePage() {
     setSelectedServices([selected]);
     setSelectedService(selected);
     setHasAddon(addon);
-    router.push("/booking/datetime");
+    router.replace("/booking/datetime");
   };
 
   return (
     <div className="flex flex-col min-h-screen bg-[#faf7f2]">
       <BookingHeader
         title="選擇服務"
-        onBack={() => router.back()}
+        onBack={() => router.push("/booking/teacher")}
       />
 
       <div className="flex-1 px-4 py-4 space-y-2">

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useBooking } from "@/lib/bookingContext";
 import BookingHeader from "@/components/BookingHeader";
+import { publicLevel } from "@/lib/mockData";
 import Button from "@/components/ui/Button";
 import { getCustomerByLineId, createBooking, upsertCustomer } from "@/lib/customerApi";
 import { sendBookingConfirmation } from "@/lib/lineNotify";
@@ -24,6 +25,15 @@ function Row({ label, value, highlight }: { label: string; value: string; highli
 export default function ConfirmPage() {
   const router = useRouter();
   const { state, getTotalPrice, setNotes } = useBooking();
+
+  // Redirect to login if user is not logged in
+  useEffect(() => {
+    if (!state.isLoggedIn || !state.user) {
+      sessionStorage.setItem("fascia_return_to", "/booking/confirm");
+      router.replace("/booking/login");
+    }
+  }, [state.isLoggedIn, state.user, router]);
+
   const [notesOpen, setNotesOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [noteTags, setNoteTags] = useState<string[]>([]);
@@ -125,8 +135,9 @@ export default function ConfirmPage() {
             lineUserId: notifyUserId,
             customerName: user.name,
             storeName: selectedStore.name,
-            staffName: `${selectedTeacher.name} ${selectedTeacher.level}`,
+            staffName: `${selectedTeacher.name} ${publicLevel(selectedTeacher.level)}`,
             serviceName: servicesToShow.map(s => s.name).join("、") + (hasAddon ? " +加購20分" : ""),
+            duration: durationTotal,
             date: dateStr,
             timeSlot: selectedTime,
             totalPrice: finalPrice,
@@ -154,7 +165,7 @@ export default function ConfirmPage() {
                   <table style="width:100%;border-collapse:collapse;margin:16px 0;">
                     <tr><td style="padding:10px 0;color:#8a7a6e;font-size:13px;border-bottom:1px solid #e8ddd2">日期時間</td><td style="padding:10px 0;font-size:13px;font-weight:600;color:#8b6748;text-align:right;border-bottom:1px solid #e8ddd2">${dateDisplay}　${selectedTime}</td></tr>
                     <tr><td style="padding:10px 0;color:#8a7a6e;font-size:13px;border-bottom:1px solid #e8ddd2">門市</td><td style="padding:10px 0;font-size:13px;font-weight:500;text-align:right;border-bottom:1px solid #e8ddd2">${selectedStore.name}</td></tr>
-                    <tr><td style="padding:10px 0;color:#8a7a6e;font-size:13px;border-bottom:1px solid #e8ddd2">技師</td><td style="padding:10px 0;font-size:13px;font-weight:500;text-align:right;border-bottom:1px solid #e8ddd2">${selectedTeacher.name} ${selectedTeacher.level}</td></tr>
+                    <tr><td style="padding:10px 0;color:#8a7a6e;font-size:13px;border-bottom:1px solid #e8ddd2">技師</td><td style="padding:10px 0;font-size:13px;font-weight:500;text-align:right;border-bottom:1px solid #e8ddd2">${selectedTeacher.name} ${publicLevel(selectedTeacher.level)}</td></tr>
                     <tr><td style="padding:10px 0;color:#8a7a6e;font-size:13px;border-bottom:1px solid #e8ddd2">服務</td><td style="padding:10px 0;font-size:13px;font-weight:500;text-align:right;border-bottom:1px solid #e8ddd2">${servicesToShow.map(s => s.name).join("、")}${hasAddon ? " +加購20分" : ""}</td></tr>
                     <tr><td style="padding:10px 0;color:#8a7a6e;font-size:13px;">費用</td><td style="padding:10px 0;font-size:16px;font-weight:700;color:#8b6748;text-align:right;">NT$${finalPrice.toLocaleString()}</td></tr>
                   </table>
@@ -190,7 +201,7 @@ export default function ConfirmPage() {
     }
 
     setSubmitting(false);
-    router.push("/booking/success");
+    router.replace("/booking/success");
   };
 
   return (
@@ -198,7 +209,7 @@ export default function ConfirmPage() {
       <BookingHeader
         title="確認預約"
         subtitle="請確認以下預約資訊"
-        onBack={() => router.back()}
+        onBack={() => router.push("/booking/datetime")}
         step={9}
       />
 
@@ -209,7 +220,7 @@ export default function ConfirmPage() {
             預約明細
           </h3>
           <Row label="門市" value={selectedStore?.name || "—"} />
-          <Row label="技師" value={selectedTeacher ? `${selectedTeacher.name} ${selectedTeacher.level}` : "—"} />
+          <Row label="技師" value={selectedTeacher ? `${selectedTeacher.name} ${publicLevel(selectedTeacher.level)}` : "—"} />
           <Row label="服務" value={servicesToShow.length > 0 ? `${servicesToShow.map(s => s.name).join("、")}${hasAddon ? " + 加購20分" : ""}` : "—"} />
           <Row label="調理時長" value={`${durationTotal} 分鐘`} />
           <Row label="日期" value={dateStr} />
@@ -268,7 +279,7 @@ export default function ConfirmPage() {
             客戶資訊
           </h3>
           <Row label="姓名" value={user?.name || "—"} />
-          <Row label="手機" value={user?.phone || "—"} />
+          <Row label="手機" value={user?.phone || "（未填寫）"} />
         </div>
 
         {/* Voucher section */}

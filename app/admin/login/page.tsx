@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAdmin } from "@/lib/adminContext";
 import { useRouter } from "next/navigation";
 
@@ -12,10 +12,9 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  if (user) {
-    router.replace("/admin/dashboard");
-    return null;
-  }
+  useEffect(() => {
+    if (user) router.replace("/admin/dashboard");
+  }, [user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

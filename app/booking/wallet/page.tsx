@@ -191,7 +191,7 @@ export default function WalletPage() {
                 <div className="bg-white rounded-2xl ring-1 ring-gray-100 p-8 text-center">
                   <p className="text-sm text-gray-400">目前沒有有效票券</p>
                   <p className="text-xs text-gray-400 mt-1">
-                    儲值 $15,000 起即贈結構訓練券
+                    儲值 $30,000 起即贈結構訓練券
                   </p>
                   <button
                     onClick={() => router.push("/booking/topup")}
@@ -215,8 +215,8 @@ export default function WalletPage() {
               <div className="space-y-1.5">
                 {[
                   { icon: "✦", text: "完成 Google 評價 → $200 折價券（30天）" },
-                  { icon: "◈", text: "儲值 $15,000 → 結構訓練券 $2,500（90天）" },
-                  { icon: "◈◉", text: "儲值 $30,000 → 結構訓練券 + 頻率檢測券（各90天）" },
+                  { icon: "◈", text: "儲值 $30,000 → 結構訓練券 $2,500（90天）" },
+                  { icon: "◈◉", text: "儲值 $50,000 → 結構訓練券*1 + 頻率檢測券*1（各90天）" },
                 ].map((item) => (
                   <div key={item.text} className="flex gap-2 text-xs text-[#8b6748]">
                     <span className="flex-shrink-0 font-medium">{item.icon}</span>

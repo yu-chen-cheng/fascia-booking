@@ -179,13 +179,13 @@ export default function SuccessPage() {
         {/* Actions */}
         <div className="w-full max-w-sm mt-6 space-y-3" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
           <button
-            onClick={() => { localStorage.removeItem("fascia_last_booking"); resetBooking(); router.push("/booking/store"); }}
+            onClick={() => { localStorage.removeItem("fascia_last_booking"); resetBooking(); router.replace("/booking/store"); }}
             className="w-full py-4 bg-[#8b6748] text-white text-base font-medium rounded-2xl shadow-md active:scale-[0.97] transition-all"
           >
             再次預約
           </button>
           <button
-            onClick={() => router.push("/booking/history")}
+            onClick={() => router.replace("/booking/history")}
             className="w-full py-3 border border-[#e8ddd2] text-[#8b6748] text-sm font-medium rounded-2xl"
           >
             查看我的預約

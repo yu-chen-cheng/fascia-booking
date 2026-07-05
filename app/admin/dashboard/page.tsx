@@ -3,9 +3,8 @@
 import { useState, useEffect } from "react";
 import { useAdmin } from "@/lib/adminContext";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 
-const supabase = createClient();
 const fmt = (n: number) => n.toLocaleString();
 
 const STATUS_LABEL: Record<string, string> = {

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useBooking } from "@/lib/bookingContext";
-import { teachers, Teacher } from "@/lib/mockData";
+import { teachers, Teacher, publicLevel } from "@/lib/mockData";
 import BookingHeader from "@/components/BookingHeader";
 
 export default function TeacherPage() {
@@ -32,7 +32,7 @@ export default function TeacherPage() {
 
   const handleContinue = () => {
     if (selected === null) return;
-    router.push("/booking/service");
+    router.replace("/booking/service");
   };
 
   const hasSelected = selected !== null;
@@ -41,7 +41,7 @@ export default function TeacherPage() {
     <div className="flex flex-col min-h-screen bg-[#faf7f2]">
       <BookingHeader
         title="選擇技師"
-        onBack={() => router.back()}
+        onBack={() => router.push("/booking/store")}
       />
 
       <div className="flex-1 px-4 py-4 space-y-2">
@@ -68,7 +68,7 @@ export default function TeacherPage() {
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-[#1c1c1c]">{teacher.name}</p>
                 <span className="text-xs text-[#8a7a6e] border border-[#e8ddd2] px-2 py-0.5 rounded">
-                  {teacher.level}
+                  {publicLevel(teacher.level)}
                 </span>
               </div>
             </button>

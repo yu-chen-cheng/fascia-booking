@@ -5,11 +5,12 @@ export async function sendBookingConfirmation(params: {
   storeName: string;
   staffName: string;
   serviceName: string;
+  duration?: number; // 服務總時長（分鐘）
   date: string;      // 'YYYY-MM-DD'
   timeSlot: string;  // 'HH:mm'
   totalPrice: number;
 }) {
-  const { lineUserId, customerName, storeName, staffName, serviceName, date, timeSlot, totalPrice } = params;
+  const { lineUserId, customerName, storeName, staffName, serviceName, duration, date, timeSlot, totalPrice } = params;
 
   // Format date to Chinese
   const d = new Date(date + "T00:00:00");
@@ -69,6 +70,7 @@ export async function sendBookingConfirmation(params: {
             infoRow("📍", "門市", storeName),
             infoRow("👤", "技師", staffName),
             infoRow("✨", "服務", serviceName),
+            ...(duration ? [infoRow("⏱", "服務時長", `${duration} 分鐘`)] : []),
             infoRow("💰", "費用", `NT$${totalPrice.toLocaleString()}`),
             { type: "separator", margin: "md", color: "#e8ddd2" },
             {
