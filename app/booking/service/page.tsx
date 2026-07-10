@@ -33,8 +33,8 @@ export default function ServicePage() {
   );
 
   const getPrice = (service: Service) => {
-    if (showDiscount) return service.priceMember[level];
-    return service.priceRegular[level];
+    if (showDiscount) return service.priceMember[level] ?? service.priceMember["初階職人"] ?? 0;
+    return service.priceRegular[level] ?? service.priceRegular["初階職人"] ?? 0;
   };
 
   const handleContinue = () => {
