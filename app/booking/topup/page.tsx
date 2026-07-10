@@ -13,8 +13,8 @@ const TOPUP_PLANS = [
     amount: 15000,
     label: "$15,000",
     tag: "推薦",
-    gifts: [],
-    desc: "儲值即享會員優惠價，任品項 9.5 折",
+    gifts: ["會員調理優惠價，法夏全商品 9.5 折"],
+    desc: "儲值即享專屬會員優惠",
   },
   {
     amount: 30000,
